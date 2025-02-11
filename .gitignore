@@ -1,0 +1,10 @@
+.clj-kondo
+.cpcache
+.nrepl-port
+*.der
+*.key
+.DS_Store
+.idea
+*.iml
+docs
+pom.xml
