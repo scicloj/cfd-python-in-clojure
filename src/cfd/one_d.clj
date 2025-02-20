@@ -1,17 +1,17 @@
-(ns cfd.one-d-linear)
+(ns cfd.one-d)
 
 (defn get-dx
   "Compute the grid spacing dx based on parameters.
   Expects keys: :x-start, :x-end, and :nx (number of spatial points)."
   [{:keys [x-start x-end nx nt c]
-    :or   {x-start 0
-           x-end   2}}]
+    :or   {x-start 0.0
+           x-end   2.0}}]
   (/ (- x-end x-start) (- nx 1)))
 
 (defn create-array-x
   "Creates an float array of x coordinates."
   [{:keys [x-start x-end nx nt c]
-    :or   {x-start 0f
+    :or   {x-start 0
            x-end   2}
     :as   params}]
   (let [dx  (get-dx params)
@@ -35,21 +35,36 @@
 (defn update-u
   "Performs one time-step update on the 1D array u.
 
-  For indices 1 to nx-1 the update is:
+  For indices 1 to nx-1 the update u is(with given co-eff):
+  1. when :linear:
    u[i] = u[i] - c * dt/dx * (u[i] - u[i-1])
 
+   *note*: then parameter :c is required.
+
+  2. when :nonlinear:
+   u[i] = u[i] - u[i] * dt/dx * (u[i] - u[i-1])
+
   The parameter map (params) must include at least:
-  - :c  (the convection coefficient)
   - :dt (the time step)
-  - :x-start, :x-end, and :nx (so that dx can be computed via get-dx)"
-  [array-u {:keys [c dt] :as params}]
-  (let [dx (get-dx params)
-        nx (alength array-u)
-        un array-u]
+  - :x-start, :x-end, and :nx (so that dx can be computed via get-dx)
+
+  Optional ones in the param map:
+  - :co-eff - either :linear(default) or :nonlinear"
+  [array-u {:keys [c dt co-eff]
+            :or   {co-eff :linear}
+            :as   params}]
+  (let [co-eff-fn (case co-eff
+                    :linear (constantly c)
+                    (fn [{:keys [u i]}] (aget u i)))
+        dx    (get-dx params)
+        nx    (alength array-u)
+        un    (float-array array-u)]
     (dotimes [i (dec nx)]
       (let [idx (inc i)]
         (aset array-u idx (float (- (aget un idx)
-                             (* c dt (/ (- (aget un idx) (aget un i)) dx)))))))
+                                    (* (co-eff-fn {:u un :i idx})
+                                       (/ dt dx)
+                                       (- (aget un idx) (aget un i))))))))
     array-u))
 
 (defn simulate
@@ -66,3 +81,5 @@
     (if (= n nt)
       current-u
       (recur (inc n) (update-u current-u params)))))
+
+(comment)

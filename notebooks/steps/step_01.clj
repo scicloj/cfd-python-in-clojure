@@ -1,14 +1,10 @@
 ^:kindly/hide-code
 (ns steps.step-01
   (:require
-   [cfd.one-d-linear :as one-d]
+   [cfd.one-d :as one-d]
    [scicloj.kindly.v4.api :as kindly]
-   [scicloj.kindly.v4.kind :as kind]))
-
-^:kindly/hide-code
-(def md (comp kindly/hide-code kind/md))
-^:kindly/hide-code
-(def tex (comp kindly/hide-code kind/tex))
+   [scicloj.kindly.v4.kind :as kind]
+   [utils.notebook :refer [md tex]]))
 
 ;; # 1-D Linear Convection Equation
 
@@ -58,6 +54,7 @@
 ^:kindly/hide-code
 array-u
 
+^:kindly/hide-code
 (let [nx      41
       array-x (one-d/create-array-x {:nx nx})
       array-u (one-d/create-array-u {:array-x array-x})]
@@ -74,9 +71,9 @@ array-u
 (def params {:x-start 0
              :x-end   2
              :nx      41
-             :nt      25
+             :nt      20
              :c       1.0
-             :dt      0.01})
+             :dt      0.025})
 
 (def array-x (one-d/create-array-x params))
 (def array-u (one-d/create-array-u {:array-x array-x}))
