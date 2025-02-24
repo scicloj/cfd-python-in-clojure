@@ -37,8 +37,8 @@
       (aset u i (condition-fn (aget array-x i))))
     u))
 
-(defn update-u
-  "Performs one time-step update on the 1D array u.
+(defn update-convection-u
+  "Performs one time-step update on the 1D array Convection u.
 
   For indices 1 to nx-1 the update u is(with given co-eff):
   1. when :linear:
@@ -73,7 +73,24 @@
                                        (- (aget un idx) (aget un i))))))))
     array-u))
 
-(defn simulate-convection
+(defn update-diffusion-u
+  [array-u {:keys [sigma nu nt]}]
+  (let [nx (alength array-u)
+        dx (get-dx {:nx nx})
+        dt (/ (* sigma (* dx dx)) nu)
+        un (float-array array-u)]
+    (dotimes [i (- nx 2)]
+      (let [i   (inc i)
+            idx (inc i)]
+        (aset array-u i
+          (float (+ (aget un i)
+                    (* (/ (* nu dt) (* dx dx))
+                       (- (+ (aget un idx)
+                             (aget un (dec i)))
+                          (* 2 (aget un i)))))))))
+    array-u))
+
+(defn simulate
   "Runs the simulation for nt time steps.
 
   Parameters:
@@ -81,11 +98,16 @@
   - params: a map containing simulation parameters (including :nt and :dt)
 
   Returns the final u array after nt updates"
-  [array-u {:keys [nt] :as params}]
-  (loop [n         0
-         current-u array-u]
-    (if (= n nt)
-      current-u
-      (recur (inc n) (update-u current-u params)))))
+  [array-u {:keys [nt mode]
+            :or   {mode :convection}
+            :as   params}]
+  (let [update-fn (case mode
+                    :diffusion update-diffusion-u
+                    update-convection-u)]
+   (loop [n         0
+          current-u array-u]
+     (if (= n nt)
+       current-u
+       (recur (inc n) (update-fn current-u params))))))
 
 (comment)

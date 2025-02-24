@@ -81,7 +81,7 @@ array-u
 (let [nx      41
       array-x (one-d/create-array-x {:nx nx})
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300

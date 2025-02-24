@@ -27,7 +27,7 @@
 (let [params  init-params
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -41,7 +41,7 @@
                   (assoc :nx 61))
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -55,7 +55,7 @@
                   (assoc :nx 81))
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -84,7 +84,7 @@
 (let [params  init-params'
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -98,7 +98,7 @@
 (let [params  (assoc init-params' :nx 61)
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -111,7 +111,7 @@
 (let [params  (assoc init-params' :nx 81)
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -124,7 +124,7 @@
 (let [params  (assoc init-params' :nx 101)
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -137,7 +137,7 @@
 (let [params  (assoc init-params' :nx 121)
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
@@ -148,4 +148,4 @@
 ;; The results show with a grid size $nx$ increases, convection travels shorter distance.
 ;; With a given $nt = 20$ in the init param, the time windows becomes shorter as a result
 ;; of increasing $nx$.
-;; 
+;;

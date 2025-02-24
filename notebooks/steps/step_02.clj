@@ -36,7 +36,7 @@
 (let [params  (dissoc init-params :c)
       array-x (one-d/create-array-x params)
       array-u (one-d/create-array-u {:array-x array-x})
-      u       (one-d/simulate-convection array-u params)]
+      u       (one-d/simulate array-u params)]
   (kind/vega-lite
     {:mark     "line"
      :width    500 :height 300
