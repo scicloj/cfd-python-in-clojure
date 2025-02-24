@@ -8,6 +8,11 @@
            x-end   2.0}}]
   (/ (- x-end x-start) (- nx 1)))
 
+(defn get-dt
+  [{:keys [sigma dx]
+    :or   {sigma 0.5}}]
+  (* sigma dx))
+
 (defn create-array-x
   "Creates an float array of x coordinates."
   [{:keys [x-start x-end nx nt c]
@@ -50,13 +55,14 @@
 
   Optional ones in the param map:
   - :co-eff - either :linear(default) or :nonlinear"
-  [array-u {:keys [c dt co-eff]
+  [array-u {:keys [c dt co-eff sigma]
             :or   {co-eff :linear}
             :as   params}]
   (let [co-eff-fn (case co-eff
                     :linear (constantly c)
                     (fn [{:keys [u i]}] (aget u i)))
         dx    (get-dx params)
+        dt    (or dt (get-dt {:sigma sigma :dx dx}))
         nx    (alength array-u)
         un    (float-array array-u)]
     (dotimes [i (dec nx)]
@@ -67,7 +73,7 @@
                                        (- (aget un idx) (aget un i))))))))
     array-u))
 
-(defn simulate
+(defn simulate-convection
   "Runs the simulation for nt time steps.
 
   Parameters:
