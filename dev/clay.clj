@@ -12,7 +12,8 @@
                          "notebooks/steps/step_01.clj"
                          "notebooks/steps/step_02.clj"
                          "notebooks/steps/cfl_condition.clj"
-                         "notebooks/steps/step_03.clj"]
+                         "notebooks/steps/step_03.clj"
+                         "notebooks/steps/step_04.clj"]
    :book                {:title "CFD Python in Clojure"}})
 
 (comment

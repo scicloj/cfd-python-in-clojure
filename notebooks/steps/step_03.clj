@@ -13,6 +13,7 @@
 (tex "\\frac{\\partial u}{\\partial t} = \\nu \\frac{\\partial^2 u}{\\partial x^2}")
 
 ;; The equation has second-order derivative, which we first learn how to implement in the code.
+;; $\nu$ is the value of viscosity.
 ;;
 ;; ## Discretizing $\frac{\partial^2 u}{\partial x^2}$
 ;;

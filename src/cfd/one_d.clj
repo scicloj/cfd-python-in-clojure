@@ -1,4 +1,8 @@
-(ns cfd.one-d)
+(ns cfd.one-d
+  (:refer-clojure :exclude [* + - /])
+  (:require
+   [fastmath.core :as fm :refer
+    [* + - / exp long-div PI pow]]))
 
 (defn get-dx
   "Compute the grid spacing dx based on parameters.
@@ -109,5 +113,56 @@
      (if (= n nt)
        current-u
        (recur (inc n) (update-fn current-u params))))))
+
+;; Burgers' Equation
+;; todo: Refactor to implement symbolic math properly(i.e. Emmy)
+
+(defn linspace [{:keys [start stop num]}]
+  (let [arr  (float-array num)
+        step (/ (- stop start) (dec num))]
+    (dotimes [i num]
+      (aset arr i (float (* i step))))
+    arr))
+
+(defn get-phi-first [{:keys [x nu t]}]
+  (exp
+    (/
+     (- (pow (- x (* 4.0 t) (* 2.0 PI)) 2))
+     (* (* 4.0 nu) (+ t 1.0)))))
+
+(defn get-phi-second [{:keys [x nu t]}]
+  (exp
+    (/
+     (- (pow (- x (* 4.0 t)) 2))
+     (* (* 4.0 nu) (+ t 1.0)))))
+
+(defn get-phi [{:keys [x nu t] :as params}]
+  (+ (get-phi-first params)
+     (get-phi-second params)))
+
+(defn get-phi-prime [{:keys [x nu t] :as params}]
+  (- (+
+      (* (get-phi-second params)
+         (/ 1.0 (* (* 4.0 nu) (+ t 1.0)))
+         (- (* 2.0 x) (* 8.0 t)))
+      (* (/ 1.0 (* (* 4.0 nu) (+ t 1.0)))
+         (- (* 2.0 x) (* 8.0 t) (* 4.0 PI))
+         (get-phi-first params)))))
+
+(defn burgers-u [{:keys [x nu t] :as params}]
+  (float (+ (- (* 2.0
+                  nu
+                  (/ (get-phi-prime params) (get-phi params))))
+            4.0)))
+
+(defn update-burger-u
+  [{:keys [dx wnx nt nu t]}]
+  (let [dt      (* dx nu)
+        x       (linspace {:start 0 :stop (* 2 PI) :num nx})
+        array-u (make-array Float nx)]
+    (dotimes [i nx]
+      (let [x-i (aget x i)]
+        (aset array-u i (burgers-u {:t t :x x-i :nu nu}))))
+    array-u))
 
 (comment)
