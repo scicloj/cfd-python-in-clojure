@@ -1,8 +1,6 @@
 (ns cfd.one-d
-  (:refer-clojure :exclude [* + - /])
   (:require
-   [fastmath.core :as fm :refer
-    [* + - / exp long-div PI pow]]))
+   [fastmath.core :as fm :refer [exp PI pow]]))
 
 (defn get-dx
   "Compute the grid spacing dx based on parameters.
@@ -156,7 +154,7 @@
             4.0)))
 
 (defn update-burger-u
-  [{:keys [dx wnx nt nu t]}]
+  [{:keys [dx nx nt nu t nx]}]
   (let [dt      (* dx nu)
         x       (linspace {:start 0 :stop (* 2 PI) :num nx})
         array-u (make-array Float nx)]

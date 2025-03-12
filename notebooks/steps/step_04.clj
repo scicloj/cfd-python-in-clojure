@@ -1,9 +1,8 @@
 ^:kindly/hide-code
 (ns steps.step-04
-  (:refer-clojure :exclude [- * /])
   (:require
    [cfd.one-d :as one-d]
-   [fastmath.core :as fm :refer [- * / PI]]
+   [fastmath.core :as fm :refer [PI]]
    [scicloj.kindly.v4.api :as kindly]
    [scicloj.kindly.v4.kind :as kind]
    [utils.notebook :refer [md tex]]))
@@ -45,8 +44,7 @@
 ;; Testing Burgers' Eqn:
 ;; _note_: currently not using adding equation very organically,
 ;; so we need to refactor.
-(one-d/update-burgers-u {:t 1.0 :x 4.0 :nu 3.0})
-
+(one-d/burgers-u {:t 1.0 :x 4.0 :nu 3.0})
 
 ;; Working on generating lambdify-ed function:
 ;;
