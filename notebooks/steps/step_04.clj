@@ -49,27 +49,70 @@
 ;; Working on generating lambdify-ed function:
 ;;
 (def nx 101)
+(def nt 100)
+(def nu 0.07)
+(def dx (* 2.0 PI (/ 1 (- nx 1))))
+(def dt (* dx nu))
+(def x-start 0)
+(def x-end (* 2.0 PI))
 
 (def init-params
-  {:nx nx
-   :dx (/ (* 2.0 PI) (- nx 1))
-   :nt 100.0
-   :nu 0.07
-   :t  0})
+  {:nx      nx
+   :dx      dx
+   :nt      nt
+   :x-start x-start
+   :x-end   x-end
+   :nu      nu
+   :dt      dt
+   :mode    :burger})
 
 ^:kindly/hide-code
-(def y-arr (one-d/update-burger-u init-params))
+(def x-arr (one-d/linspace {:start x-start
+                            :stop  x-end
+                            :num   nx}))
+
+^:kindly/hide-code
+(def y-arr (one-d/update-analytical-burger-u init-params))
 
 ;; Calculate u and plot:
 ^:kindly/hide-code y-arr
 
 ^:kindly/hide-code
-(let [x-arr (one-d/linspace {:start 0 :stop (* 2.0 PI) :num nx})]
- (kind/vega-lite
-   {:mark     "point"
-    :width    500 :height 300
-    :encoding {:x {:field "x" :type "quantitative"}
-               :y {:field "y" :type "quantitative"}}
-    :data     {:values (into [] (map #(hash-map :x % :y %2) x-arr y-arr))}}))
+(kind/vega-lite
+  {:mark     "point"
+   :width    500 :height 300
+   :encoding {:x {:field "x" :type "quantitative"}
+              :y {:field "y" :type "quantitative"}}
+   :data     {:values (into [] (map #(hash-map :x % :y %2) x-arr y-arr))}})
 ;; ^^_"saw-tooth function"_
 
+
+;; ## Periodic Boundary Conditions
+;;
+;; With periodic boundary conditions, when a point gets to the right-hand side of the frame, it wraps around back to the front of the frame.
+;;
+;; Bringing the discretized equation from the above:
+(tex
+  (str "u_i^{n+1} = u_i^n - u_i^n \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n) + "
+       "\\nu\\frac{\\Delta t}{\\Delta x^2}(u_{i+1}^n + u_{i-1}^n - 2u_i^n)"))
+
+;; Drawing both analytical and computational results in the same plot:
+^:kindly/hide-code
+(let [u-computational (one-d/simulate y-arr init-params)
+      u-analytical    (one-d/update-analytical-burger-u (assoc init-params :dt (* nt dt)))]
+  (kind/vega-lite
+    {:mark  "point"
+     :width 500 :height 300
+     :layer [{:mark     {:type "line" :color "green" :point {:filled false
+                                                             :color  "green"
+                                                             :fill   "white"}}
+              :encoding {:x {:field "x" :type "quantitative"}
+                         :y {:field "computational" :type "quantitative"}}}
+
+             {:mark     {:type "line" :color "orange"}
+              :encoding {:x {:field "x" :type "quantitative"}
+                         :y {:field "analytical" :type "quantitative"}}}]
+     :data  {:values (into [] (map #(hash-map :x % :computational %2 :analytical %3)
+                                   x-arr
+                                   u-computational
+                                   u-analytical))}}))

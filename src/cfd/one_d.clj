@@ -92,6 +92,37 @@
                           (* 2 (aget un i)))))))))
     array-u))
 
+(defn get-burger-array-un [un-i+1 un-i un-i-1{:keys [dx nx nt nu dt nx]}]
+  (float (+ un-i
+            (- (* un-i
+                  dt
+                  (/ 1 dx)
+                  (- un-i un-i-1)))
+            (* nu
+               dt
+               (/ 1 (* dx dx))
+               (+ un-i+1
+                  (- (* 2 un-i))
+                  un-i-1)))))
+
+(defn update-computational-burger-u
+  [array-u {:keys [dx nx nt nu dt nx] :as params}]
+  (let [un (float-array array-u)]
+    (dotimes [i (- nx 2)]
+      (let [i (inc i)]
+       (aset array-u i (get-burger-array-un
+                         (aget un (inc i))
+                         (aget un i)
+                         (aget un (dec i))
+                         params))))
+    (aset array-u 0 (get-burger-array-un
+                      (aget un 1)
+                      (aget un 0)
+                      (aget un (- nx 2))
+                      params))
+    (aset array-u (dec nx) (aget array-u 0))
+    array-u))
+
 (defn simulate
   "Runs the simulation for nt time steps.
 
@@ -100,11 +131,12 @@
   - params: a map containing simulation parameters (including :nt and :dt)
 
   Returns the final u array after nt updates"
-  [array-u {:keys [nt mode]
+  [array-u {:keys [nt nx mode]
             :or   {mode :convection}
             :as   params}]
   (let [update-fn (case mode
                     :diffusion update-diffusion-u
+                    :burger update-computational-burger-u
                     update-convection-u)]
    (loop [n         0
           current-u array-u]
@@ -112,7 +144,7 @@
        current-u
        (recur (inc n) (update-fn current-u params))))))
 
-;; Burgers' Equation
+;; Burgers' Equation Analytical Approach
 ;; todo: Refactor to implement symbolic math properly(i.e. Emmy)
 
 (defn linspace [{:keys [start stop num]}]
@@ -153,14 +185,15 @@
                   (/ (get-phi-prime params) (get-phi params))))
             4.0)))
 
-(defn update-burger-u
-  [{:keys [dx nx nt nu t nx]}]
-  (let [dt      (* dx nu)
-        x       (linspace {:start 0 :stop (* 2 PI) :num nx})
+(defn update-analytical-burger-u
+  [{:keys [dx nx nt nu dt nx x-start x-end]
+    :or   {x-start 0
+           x-end   (* 2.0 PI)}}]
+  (let [x       (linspace {:start x-start :stop x-end :num nx})
         array-u (make-array Float nx)]
     (dotimes [i nx]
       (let [x-i (aget x i)]
-        (aset array-u i (burgers-u {:t t :x x-i :nu nu}))))
+        (aset array-u i (burgers-u {:t dt :x x-i :nu nu}))))
     array-u))
 
 (comment)
