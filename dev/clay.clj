@@ -16,6 +16,13 @@
                          "notebooks/steps/step_04.clj"]
    :book                {:title "CFD Python in Clojure"}})
 
+(def revealjs-live-reload-make-config
+  {:base-source-path nil
+   :live-reload      true
+   :format           [:quarto :revealjs]
+   :source-path      "clj-file-path"
+   :quarto           {:format {:revealjs {:theme :serif}}}})
+
 (comment
   (clay/config)
 
@@ -23,4 +30,9 @@
 
   (clay/browse!)
 
-  (clay/make! make-config))
+  ;; notebooks livereload
+  (clay/make! make-config)
+
+  ;; revealjs live reload
+  (do (clay/stop!)
+      (clay/make! revealjs-live-reload-make-config)))

@@ -36,7 +36,9 @@
         nx      (or nx (alength array-x))
         u       (float-array nx)]
     (dotimes [i nx]
-      (aset u i (condition-fn (aget array-x i))))
+      (let [x-val (aget array-x i)
+            u-val (float (condition-fn x-val))]
+       (aset u i u-val)))
     u))
 
 (defn update-convection-u
@@ -76,6 +78,7 @@
     array-u))
 
 (defn update-diffusion-u
+  "u[i] = u[i] + nu * dt / dx^2 * (u[i] + u[i-1] - 2 * u[i])"
   [array-u {:keys [sigma nu nt]}]
   (let [nx (alength array-u)
         dx (get-dx {:nx nx})
@@ -138,11 +141,31 @@
                     :diffusion update-diffusion-u
                     :burger update-computational-burger-u
                     update-convection-u)]
-   (loop [n         0
-          current-u array-u]
+   (loop [n 0]
      (if (= n nt)
-       current-u
-       (recur (inc n) (update-fn current-u params))))))
+       array-u
+       (do (update-fn array-u params) (recur (inc n)))))))
+
+(defn simulate-cumulate
+  "Runs the simulation for nt time steps and cumulate those results.
+
+  Parameters:
+  - array-u: the initial u array
+  - params: a map containing simulation parameters (including :nt and :dt)
+
+  Returns the vector arrays of u array after nt updates"
+  [array-u {:keys [nt nx mode]
+            :or   {mode :convection}
+            :as   params}]
+  (let [update-fn (case mode
+                    :diffusion update-diffusion-u
+                    :burger update-computational-burger-u
+                    update-convection-u)]
+    (loop [n   0
+           cum [(vec array-u)]]
+      (if (= n nt)
+        cum
+        (recur (inc n) (conj cum (vec (update-fn array-u params))))))))
 
 ;; Burgers' Equation Analytical Approach
 ;; todo: Refactor to implement symbolic math properly(i.e. Emmy)
