@@ -59,27 +59,35 @@
 
   Optional ones in the param map:
   - :co-eff - either :linear(default) or :nonlinear"
-  [array-u {:keys [c dt co-eff sigma]
-            :or   {co-eff :linear}
+  [array-u {:keys [c dx dt nx co-eff sigma]
+            :or   {co-eff :linear
+                   c      1.0}
             :as   params}]
   (let [co-eff-fn (case co-eff
                     :linear (constantly c)
-                    (fn [{:keys [u i]}] (aget u i)))
-        dx    (get-dx params)
+                    :nonlinear identity
+                    identity)
+        dx    (or dx (get-dx params))
         dt    (or dt (get-dt {:sigma sigma :dx dx}))
-        nx    (alength array-u)
+        nx    (or nx (alength array-u))
         un    (float-array array-u)]
-    (dotimes [i (dec nx)]
-      (let [idx (inc i)]
-        (aset array-u idx (float (- (aget un idx)
-                                    (* (co-eff-fn {:u un :i idx})
-                                       (/ dt dx)
-                                       (- (aget un idx) (aget un i))))))))
+    (dotimes [i (- nx 2)]
+      (let [i      (inc i)
+            un-i   (aget un i)
+            un-i-1 (aget un (dec i))]
+        (aset array-u i (float (- un-i
+                                  (* (co-eff-fn un-i)
+                                     dt
+                                     (/ 1 dx)
+                                     (- un-i un-i-1)))))))
+    (aset array-u 0 (aget un 1))
+    (aset array-u (dec nx) (aget un (- nx 2)))
     array-u))
 
 (defn update-diffusion-u
   "u[i] = u[i] + nu * dt / dx^2 * (u[i] + u[i-1] - 2 * u[i])"
-  [array-u {:keys [sigma nu nt]}]
+  [array-u {:keys [sigma nu nt]
+            :or   {sigma 0.2}}]
   (let [nx (alength array-u)
         dx (get-dx {:nx nx})
         dt (/ (* sigma (* dx dx)) nu)
@@ -161,11 +169,11 @@
                     :diffusion update-diffusion-u
                     :burger update-computational-burger-u
                     update-convection-u)]
-    (loop [n   0
-           cum [(vec array-u)]]
+    (loop [n    0
+           !cum (transient [(vec array-u)])]
       (if (= n nt)
-        cum
-        (recur (inc n) (conj cum (vec (update-fn array-u params))))))))
+        (persistent! !cum)
+        (recur (inc n) (conj! !cum (vec (update-fn array-u params))))))))
 
 ;; Burgers' Equation Analytical Approach
 ;; todo: Refactor to implement symbolic math properly(i.e. Emmy)
