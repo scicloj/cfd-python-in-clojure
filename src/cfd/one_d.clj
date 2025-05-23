@@ -1,6 +1,8 @@
 (ns cfd.one-d
   (:require
-   [fastmath.core :as fm :refer [exp PI pow]]))
+   [clojure.set]
+   [fastmath.core :as fm :refer [exp PI pow]]
+   [utils.num-clj :as num-clj]))
 
 (defn get-dx
   "Compute the grid spacing dx based on parameters.
@@ -19,13 +21,12 @@
   "Creates an float array of x coordinates."
   [{:keys [x-start x-end nx nt c]
     :or   {x-start 0
-           x-end   2}
-    :as   params}]
-  (let [dx  (get-dx params)
-        arr (float-array nx)]
-    (dotimes [i nx]
-      (aset arr i (float (+ x-start (* i dx)))))
-    arr))
+           x-end   2
+           nx      50}
+    :as   _params}]
+  (num-clj/linspace {:start x-start
+                     :stop  x-end
+                     :num   nx}))
 
 (defn create-array-u
   "Creates an initial float array of u using a condition function."
@@ -178,13 +179,6 @@
 ;; Burgers' Equation Analytical Approach
 ;; todo: Refactor to implement symbolic math properly(i.e. Emmy)
 
-(defn linspace [{:keys [start stop num]}]
-  (let [arr  (float-array num)
-        step (/ (- stop start) (dec num))]
-    (dotimes [i num]
-      (aset arr i (float (* i step))))
-    arr))
-
 (defn get-phi-first [{:keys [x nu t]}]
   (exp
     (/
@@ -220,7 +214,7 @@
   [{:keys [dx nx nt nu dt nx x-start x-end]
     :or   {x-start 0
            x-end   (* 2.0 PI)}}]
-  (let [x       (linspace {:start x-start :stop x-end :num nx})
+  (let [x       (num-clj/linspace {:start x-start :stop x-end :num nx})
         array-u (make-array Float nx)]
     (dotimes [i nx]
       (let [x-i (aget x i)]

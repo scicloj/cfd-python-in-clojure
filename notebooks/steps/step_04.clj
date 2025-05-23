@@ -67,9 +67,7 @@
    :mode    :burger})
 
 ^:kindly/hide-code
-(def x-arr (one-d/linspace {:start x-start
-                            :stop  x-end
-                            :num   nx}))
+(def x-arr (one-d/create-array-x init-params))
 
 ^:kindly/hide-code
 (def y-arr (one-d/update-analytical-burger-u init-params))
