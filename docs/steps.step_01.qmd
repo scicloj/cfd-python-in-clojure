@@ -1,0 +1,159 @@
+---
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    theme: [cosmo, notebooks/custom.scss]
+    output-file: steps.step_01.html
+code-block-background: true
+
+---
+<style></style><style>.printedClojure .sourceCode {
+  background-color: transparent;
+  border-style: none;
+}
+</style><style>.clay-limit-image-width .clay-image {max-width: 100%}
+.clay-side-by-side .sourceCode {margin: 0}
+.clay-side-by-side {margin: 1em 0}
+</style>
+<script src="steps.step_01_files/md-default0.js" type="text/javascript"></script><script src="steps.step_01_files/md-default1.js" type="text/javascript"></script><script src="steps.step_01_files/katex2.js" type="text/javascript"></script><script src="steps.step_01_files/vega3.js" type="text/javascript"></script><script src="steps.step_01_files/vega4.js" type="text/javascript"></script><script src="steps.step_01_files/vega5.js" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
+
+# 1-D Linear Convection
+
+
+## What is [Convection](https://en.wikipedia.org/wiki/Convection)
+To briefly describe, convection is like movement affected by the fluid flow itself.
+
+
+## The Equation
+
+$$\frac{\partial u }{\partial t} + c \frac{\partial u}{\partial x} = 0$$
+
+- $c$: speed of initial wave
+- Initial condition(at the time $t = 0$, the velocity of the flow, and here it's understood as a _wave_) denotes as $u_0$:
+
+$$u(x, 0) = u_0(x)$$
+
+Then the exact solution of the linear convection equation:
+
+$$u(x, t) = u_0(x - ct)$$
+
+We discretize this equation in both space and time,
+using the Forward difference scheme for the time derivative and
+the Backward difference scheme for the space derivative
+from the definition of a derivative,
+
+Consider discretizing the spatial coordinate $x$ into points that we index from $i = 0$ to $N$,
+and stepping in discrete time intervals of size $\Delta t$
+
+$$\frac{\partial u}{\partial x} \approx \frac{u(x + \Delta x) - u(x)}{\Delta x}$$
+
+discrete equation follows:
+
+$$\frac{u_i^{n+1} - u_i^n}{\Delta t} + c \frac{u_i^n - u_{i-1}^n}{\Delta x} = 0$$
+
+- $n$ & $n + 1$: two consecutive steps in time
+
+- $i - 1$ & $i$: two neighboring points of the discretized x coordinate
+We can solve for our unknown to get an equation that allows us to advance in time, as follows:
+
+$$u_i^{n+1} = n_i^n - c \frac{\Delta t}{\Delta x}(u_i^n - u_{i-1}^n)$$
+
+
+## Implementation
+
+nx: steps (= 41)
+dx = 2 / (nx - 1) (x-start = 0, x-end = 2)
+nt: the number of timesteps we want to calculate (= 25)
+dt: the amount of time each timestep covers (delta t) (= .25)
+c: wave speed  (= 1)
+
+initial conditions:
+1. initial velocity $u_0$ is given as $u = 2$
+in the interval $0.5 \le x \le 1$ and $u = 1$ everywhere else in $(0, 2)$
+
+
+array-u outputs:
+
+
+::: {.printedClojure}
+```clojure
+[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0,
+ 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+```
+:::
+
+
+
+```{=html}
+<div><script>vegaEmbed(document.currentScript.parentElement, {"mark":"line","width":500,"height":300,"encoding":{"x":{"field":"x","type":"quantitative"},"y":{"field":"y","type":"quantitative"}},"data":{"values":[{"y":1.0,"x":0.0},{"y":1.0,"x":0.05},{"y":1.0,"x":0.1},{"y":1.0,"x":0.15},{"y":1.0,"x":0.2},{"y":1.0,"x":0.25},{"y":1.0,"x":0.3},{"y":1.0,"x":0.35},{"y":1.0,"x":0.4},{"y":1.0,"x":0.45},{"y":2.0,"x":0.5},{"y":2.0,"x":0.55},{"y":2.0,"x":0.6},{"y":2.0,"x":0.65},{"y":2.0,"x":0.7},{"y":2.0,"x":0.75},{"y":2.0,"x":0.8},{"y":2.0,"x":0.85},{"y":2.0,"x":0.9},{"y":2.0,"x":0.95},{"y":2.0,"x":1.0},{"y":1.0,"x":1.05},{"y":1.0,"x":1.1},{"y":1.0,"x":1.15},{"y":1.0,"x":1.2},{"y":1.0,"x":1.25},{"y":1.0,"x":1.3},{"y":1.0,"x":1.35},{"y":1.0,"x":1.4},{"y":1.0,"x":1.45},{"y":1.0,"x":1.5},{"y":1.0,"x":1.55},{"y":1.0,"x":1.6},{"y":1.0,"x":1.65},{"y":1.0,"x":1.7},{"y":1.0,"x":1.75},{"y":1.0,"x":1.8},{"y":1.0,"x":1.85},{"y":1.0,"x":1.9},{"y":1.0,"x":1.95},{"y":1.0,"x":2.0}]}});</script></div>
+```
+
+
+time to implement discretization of the convention equation using a finite-difference scheme
+
+
+
+::: {.sourceClojure}
+```clojure
+(def params {:x-start 0
+             :x-end   2
+             :nx      41
+             :nt      20
+             :c       1.0
+             :dt      0.025})
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-x (one-d/create-array-x params))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-u (one-d/create-array-u {:array-x array-x}))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(let [nx      41
+      array-x (one-d/create-array-x {:nx nx})
+      array-u (one-d/create-array-u {:array-x array-x})
+      u       (one-d/simulate array-u params)]
+  (kind/vega-lite
+    {:mark     "line"
+     :width    500 :height 300
+     :encoding {:x {:field "x" :type "quantitative"}
+                :y {:field "y" :type "quantitative"}}
+     :data     {:values (into [] (map #(hash-map :x % :y %2) array-x u))}}))
+```
+:::
+
+
+
+```{=html}
+<div><script>vegaEmbed(document.currentScript.parentElement, {"mark":"line","width":500,"height":300,"encoding":{"x":{"field":"x","type":"quantitative"},"y":{"field":"y","type":"quantitative"}},"data":{"values":[{"y":1.0,"x":0.0},{"y":1.0,"x":0.05},{"y":1.0,"x":0.1},{"y":1.0,"x":0.15},{"y":1.0,"x":0.2},{"y":1.0,"x":0.25},{"y":1.0,"x":0.3},{"y":1.0,"x":0.35},{"y":1.0,"x":0.4},{"y":1.0,"x":0.45},{"y":1.000001,"x":0.5},{"y":1.00002,"x":0.55},{"y":1.0002012,"x":0.6},{"y":1.0012884,"x":0.65},{"y":1.005909,"x":0.7},{"y":1.0206947,"x":0.75},{"y":1.0576591,"x":0.8},{"y":1.131588,"x":0.85},{"y":1.2517223,"x":0.9},{"y":1.4119015,"x":0.95},{"y":1.5880985,"x":1.0},{"y":1.7482767,"x":1.05},{"y":1.868392,"x":1.1},{"y":1.9421396,"x":1.15},{"y":1.9780169,"x":1.2},{"y":1.9881821,"x":1.25},{"y":1.9780169,"x":1.3},{"y":1.9421396,"x":1.35},{"y":1.868392,"x":1.4},{"y":1.7482767,"x":1.45},{"y":1.5880985,"x":1.5},{"y":1.4119015,"x":1.55},{"y":1.2517223,"x":1.6},{"y":1.131588,"x":1.65},{"y":1.0576591,"x":1.7},{"y":1.0206947,"x":1.75},{"y":1.005909,"x":1.8},{"y":1.0012884,"x":1.85},{"y":1.0002012,"x":1.9},{"y":1.00002,"x":1.95},{"y":1.0000019,"x":2.0}]}});</script></div>
+```
+
+
+
+```{=html}
+<div style="background-color:grey;height:2px;width:100%;"></div>
+```
+
+
+
+```{=html}
+<div><pre><small><small>source: <a href="https://github.com/scicloj/cfd-python-in-clojure/blob/main/notebooks/steps/step_01.clj">notebooks/steps/step_01.clj</a></small></small></pre></div>
+```

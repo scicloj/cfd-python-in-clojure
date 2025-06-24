@@ -1,0 +1,10 @@
+[{:title "Step 1 - 1-D Linear Convection"
+  :src   "notebooks/steps/step_01.clj"}
+ {:title "Step 2 - Nonlinear Convection"
+  :src   "notebooks/steps/step_02.clj"}
+ {:title "Convergence and the CFL Condition"
+  :src   "notebooks/steps/cfl_condition.clj"}
+ {:title "Step 3 - 1-D Diffusion Equation"
+  :src   "notebooks/steps/step_03.clj"}
+ {:title "Step 4- 1-D Burgers' Equation"
+  :src   "notebooks/steps/step_04.clj"}]

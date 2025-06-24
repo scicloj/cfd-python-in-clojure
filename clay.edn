@@ -1,1 +1,6 @@
-{:base-source-path "notebooks"}
+{:remote-repo      {:git-url "https://github.com/scicloj/cfd-python-in-clojure"
+                    :branch  "main"}
+ :quarto           {:format {:html {:toc       true
+                                    :toc-depth 4
+                                    :theme     [:cosmo "notebooks/custom.scss"]}}}
+ :base-target-path "temp"}

@@ -18,7 +18,7 @@
   (* sigma dx))
 
 (defn create-array-x
-  "Creates an float array of x coordinates."
+  "Creates a float array of x coordinates."
   [{:keys [x-start x-end nx nt c]
     :or   {x-start 0
            x-end   2

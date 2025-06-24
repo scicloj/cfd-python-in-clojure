@@ -1,26 +1,30 @@
 (ns clay
   (:require
+   [clojure.edn :as edn]
    [scicloj.clay.v2.api :as clay]))
 
-(def make-config
-  {:base-source-path    nil #_"notebooks" ;;files watch doesn't work
-   :live-reload         true
-   :format              [:quarto :html]
-   :base-target-path    "docs"
-   :clean-up-target-dir true
-   :source-path         ["notebooks/index.clj"
-                         "notebooks/steps/step_01.clj"
-                         "notebooks/steps/step_02.clj"
-                         "notebooks/steps/cfl_condition.clj"
-                         "notebooks/steps/step_03.clj"
-                         "notebooks/steps/step_04.clj"]
-   :book                {:title "CFD Python in Clojure"}})
+(def steps-file-path "notebooks/steps.edn")
 
-(def revealjs-live-reload-make-config
+(def full-source-path
+  (into ["notebooks/index.clj"]
+        (->> steps-file-path
+             ((comp edn/read-string slurp))
+             (map :src))))
+
+(def make-config
+  (merge
+    ((comp edn/read-string slurp) "clay.edn")
+    {:format              [:quarto :html]
+     :base-target-path    "docs"
+     :clean-up-target-dir true
+     :source-path         full-source-path
+     :book                {:title "CFD Python in Clojure"}}))
+
+(def talk-make-config
   {:base-source-path nil
    :live-reload      true
    :format           [:quarto :revealjs]
-   :source-path      "clj-file-path"
+   :source-path      "notebooks/conferences/scinoj_light_1/siyoung_talk.clj"
    :quarto           {:format {:revealjs {:theme :serif}}}})
 
 (comment
@@ -30,9 +34,8 @@
 
   (clay/browse!)
 
-  ;; notebooks livereload
+  ;; notebooks build
   (clay/make! make-config)
 
-  ;; revealjs live reload
-  (do (clay/stop!)
-      (clay/make! revealjs-live-reload-make-config)))
+  ;; conference talk build
+  (clay/make! talk-make-config))
