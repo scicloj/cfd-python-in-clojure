@@ -38,4 +38,9 @@
   (clay/make! make-config)
 
   ;; conference talk build
-  (clay/make! talk-make-config))
+  (clay/make! talk-make-config)
+
+  ;; a (latest) single notebook file only build
+  (clay/make! (-> make-config
+                  (update :source-path #(last %))
+                  (assoc :live-reload true :book nil))))
