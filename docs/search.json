@@ -24,7 +24,7 @@
     "href": "index.html#steps",
     "title": "CFD Python in Clojure",
     "section": "1.2 Steps",
-    "text": "1.2 Steps\n\nStep 1 - 1-D Linear Convection\nStep 2 - Nonlinear Convection\nConvergence and the CFL Condition\nStep 3 - 1-D Diffusion Equation\nStep 4- 1-D Burgers’ Equation\n\n\nsource: notebooks/index.clj",
+    "text": "1.2 Steps\n\nStep 1 - 1-D Linear Convection\nStep 2 - Nonlinear Convection\nConvergence and the CFL Condition\nStep 3 - 1-D Diffusion Equation\nStep 4- 1-D Burgers’ Equation\nStep 5- 2-D Linear Convection\n\n\nsource: notebooks/index.clj",
     "crumbs": [
       "<span class='chapter-number'>1</span>  <span class='chapter-title'>CFD Python in Clojure</span>"
     ]
@@ -147,6 +147,16 @@
     "text": "6.2 Periodic Boundary Conditions\nWith periodic boundary conditions, when a point gets to the right-hand side of the frame, it wraps around back to the front of the frame.\nBringing the discretized equation from the above:\n\\[u_i^{n+1} = u_i^n - u_i^n \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n) + \\nu\\frac{\\Delta t}{\\Delta x^2}(u_{i+1}^n + u_{i-1}^n - 2u_i^n)\\]\nDrawing both analytical and computational results in the same plot:\n\n\nsource: notebooks/steps/step_04.clj",
     "crumbs": [
       "<span class='chapter-number'>6</span>  <span class='chapter-title'>1-D Burgers' Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_05.html",
+    "href": "steps.step_05.html",
+    "title": "7  Step 5: 2-D Linear Convection",
+    "section": "",
+    "text": "Expanding from 1D to 2D. Following exercises extends firstly to 2D. The expansion simply requires to apply the definition: a partial derivative with respect to \\(x\\) is the variation in the \\(x\\) direction at constant \\(y\\).\nIn 2D space, a rectangular(uniform) grid is defined by the points with coordinates:\n\\[x_i = x_0 + i \\Delta x\\]\n\\[y_i = y_0 + i \\Delta y\\]\nThen also define $u_{i,j} = u(x_i, y_j) and apply the finite-difference formulas on either variable \\(x, y\\) acting separately on the \\(i\\) and \\(j\\) indices. All derivatives are based on the 2D Taylor expansion of a mesh point value around \\(u_{ij}\\)\nHence, for a first-order partial derivative in the x-direction, a finite-difference formula is:\n\\[\\frac{\\partial u}{\\partial x}\\biggr\\rvert_{i,j} = \\frac{u_{i+1,j}-u_{i,j}}{\\Delta x}+\\mathcal{O}(\\Delta x)\\]\nand similarly in the \\(y\\) direction. Thus, we can write backward-difference, forward-difference or central difference formulas for Step 5 to 12.\nThe PDE governing 2-D Linear Convection is written as\n\\[\\frac{\\partial u}{\\partial t}+c\\frac{\\partial u}{\\partial x} + c\\frac{\\partial u}{\\partial y} = 0\\]\nThis is the same form in 1-D, then added one more dimension to account for as we step forward in time.\nWe will use: - a forward difference discretization for the timestep - a backward difference discretization for two spatial steps\nWith 1-D implementations, we used \\(i\\) subscripts to denote movement in space (e.g. \\(u_i^n - u_{i-1}^n\\)). Now that we have two dimensions to account for, we need to add a second subscript, \\(j\\), to account for all the information in the regime.\nHere, we’ll again use \\(i\\) as the index for our \\(x\\) values, and we’ll add the \\(j\\) subscript to track our \\(y\\) values.\nWith that in mind, our discretization of the PD should be relatively straightforward.\n\\[\\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\\Delta t} + c\\frac{u_{i, j}^n-u_{i-1,j}^n}{\\Delta x} + c\\frac{u_{i,j}^n-u_{i,j-1}^n}{\\Delta y}=0\\]\nAs before, solve for the only unknown:\n\\[u_{i,j}^{n+1} = u_{i,j}^n-c \\frac{\\Delta t}{\\Delta x}(u_{i,j}^n-u_{i-1,j}^n)-c \\frac{\\Delta t}{\\Delta y}(u_{i,j}^n-u_{i,j-1}^n)\\]\nWe will solve this equation with the following initial conditions:\n\\[u(x,y) = \\begin{cases}\n\\begin{matrix}\n2\\ \\text{for} & 0.5 \\leq x, y \\leq 1 \\cr\n1\\ \\text{for} & \\text{everywhere else}\\end{matrix}\\end{cases}\\]\nand the boundary conditions:\n\\[u = 1\\ \\text{for } \\begin{cases}\n\\begin{matrix}\nx =  0,\\ 2 \\cr\ny =  0,\\ 2 \\end{matrix}\\end{cases}\\]\nWe plot here using plotly, then using :mesh3d as the type of the plot. And here’s a reference doc from kindly notebook. The plotting data formats goes like:\n\n_unnamed [6561 3]:\n\n\n\n:x\n:y\n:z\n\n\n\n\n0.000\n0.0\n1.0\n\n\n0.025\n0.0\n1.0\n\n\n0.050\n0.0\n1.0\n\n\n…\n…\n…\n\n\n1.925\n2.0\n0.0\n\n\n1.950\n2.0\n0.0\n\n\n1.975\n2.0\n0.0\n\n\n2.000\n2.0\n0.0\n\n\n\n\ninitial plotting goes:\n\nnote: for now, we skip 3d plotting notes from PythonCFD(further TODO)\n\n7.0.1 Iterating in 2-D w/ linear convection equation\n\n\nsource: notebooks/steps/step_05.clj",
+    "crumbs": [
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Step 5: 2-D Linear Convection</span>"
     ]
   }
 ]
