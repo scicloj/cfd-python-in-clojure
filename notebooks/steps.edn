@@ -8,7 +8,9 @@
   :src   "notebooks/steps/step_03.clj"}
  {:title "Step 4- 1-D Burgers' Equation"
   :src   "notebooks/steps/step_04.clj"}
- {:title "Step 5- 2-D Linear Convection"
+ {:title "Step 5- 2-D Linear Convection Equation"
   :src   "notebooks/steps/step_05.clj"}
- {:title "Step 6- 2-D Nonlinear Convection"
-  :src   "notebooks/steps/step_06.clj"}]
+ {:title "Step 6- 2-D Nonlinear Convection Equation"
+  :src   "notebooks/steps/step_06.clj"}
+ {:title "Step 7- 2-D Diffusion Equation"
+  :src   "notebooks/steps/step_07.clj"}]

@@ -74,7 +74,7 @@
    (dotimes [y-idx (- ny 1)]
      (aset array-u y-idx 0 (float 1))
      (aset array-u y-idx (dec nx) (float 1))))
-  array-u)
+  {:array-u array-u})
 
 (defn- update-nonlinear-convection-u
   [{:keys [array-u array-v]} {:keys [dx dy dt nx ny]
@@ -107,12 +107,14 @@
                           (* v-j-i
                              (/ dt dy)
                              (- v-j-i v-j-1-i))))))))))
-    ;; boundary condition
+
+    ;; boundary condition for u
     (aset array-u 0 (float-array nx 1))
     (aset array-u (dec ny) (float-array nx 1))
     (dotimes [y-idx (- ny 1)]
       (aset array-u y-idx 0 (float 1))
       (aset array-u y-idx (dec nx) (float 1)))
+
     ;; boundary condition for v
     (aset array-v 0 (float-array nx 1))
     (aset array-v (dec ny) (float-array nx 1))
@@ -122,7 +124,39 @@
   {:array-u array-u
    :array-v array-v})
 
+(defn- update-diffusion-u
+  [{:keys [array-u]} {:keys [nu dx dy dt nx ny]
+                      :as   params}]
+  (let [un (object-array array-u)]
+    (dotimes [y-idx (- ny 1)]
+      (when (and (pos? y-idx) (< y-idx (dec ny)))
+        (dotimes [x-idx (- nx 1)]
+          (when (and (pos? x-idx) (< x-idx (dec nx)))
+            (let [u-j-i       (aget un y-idx x-idx)
+                  u-j-i-1     (aget un y-idx (dec x-idx))
+                  u-j-i+1     (aget un y-idx (inc x-idx))
+                  u-j-1-i     (aget un (dec y-idx) x-idx)
+                  u-j+1-i     (aget un (inc y-idx) x-idx)
+                  diffusion-x (* nu
+                                 (/ dt (* dx dx))
+                                 (+ u-j-i+1
+                                    (* -2 u-j-i)
+                                    u-j-i-1))
+                  diffusion-y (* nu
+                                 (/ dt (* dy dy))
+                                 (+ u-j+1-i
+                                    (* -2 u-j-i)
+                                    u-j-1-i))]
+              (aset array-u y-idx x-idx
+                (float (+ u-j-i diffusion-x diffusion-y))))))))
 
+    ;; boundary condition
+    (aset array-u 0 (float-array nx 1))
+    (aset array-u (dec ny) (float-array nx 1))
+    (dotimes [y-idx (- ny 1)]
+      (aset array-u y-idx 0 (float 1))
+      (aset array-u y-idx (dec nx) (float 1))))
+  {:array-u array-u})
 
 (defn simulate
   "Runs the simulation for nt time steps.
@@ -137,8 +171,9 @@
     :or   {mode :convection}
     :as   params}]
   (let [update-fn (case mode
-                    :convection update-convection-u
-                    :nonlinear-convection update-nonlinear-convection-u)]
+                    :nonlinear-convection update-nonlinear-convection-u
+                    :diffusion update-diffusion-u
+                    update-convection-u)]
     (loop [n 0]
       (if (= n nt)
         vel-arr-vec

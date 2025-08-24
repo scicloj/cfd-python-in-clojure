@@ -15,7 +15,7 @@
 ;;
 (tex "\\frac{\\partial v}{\\partial t} + u \\frac{\\partial v}{\\partial x} + v \\frac{\\partial v}{\\partial y} = 0")
 ;;
-;; Descretizing these equations using hte methods we've applied previously yields:
+;; Descretizing these equations using the methods we've applied previously yields:
 ;;
 (tex "\\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\\Delta t} + u_{i,j}^n \\frac{u_{i,j}^n-u_{i-1,j}^n}{\\Delta x} + v_{i,j}^n \\frac{u_{i,j}^n-u_{i,j-1}^n}{\\Delta y} = 0")
 ;;
