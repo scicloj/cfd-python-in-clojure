@@ -1,12 +1,7 @@
 {:paths ["src"]
  :deps
- {org.clojure/clojure  {:mvn/version "1.12.0"}
-  org.scicloj/noj      {:mvn/version "2-beta18"}
-
-  ;; todo:
-  cnuernber/dtype-next {:mvn/version "10.141"}
-  org.mentat/emmy      {:mvn/version "0.32.0"}}
+ {org.clojure/clojure {:mvn/version "1.12.1"}
+  org.scicloj/noj     {:mvn/version "2-beta18"}}
 
  :aliases
  {:dev {:extra-paths ["dev" "notebooks"]}}}
-

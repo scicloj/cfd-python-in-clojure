@@ -2,6 +2,7 @@
 (ns steps.step-05
   (:require
    [cfd.two-d :as two-d]
+   [scicloj.kindly.v4.api :as kindly]
    [scicloj.kindly.v4.kind :as kind]
    [tablecloth.api :as tc]
    [utils.notebook :refer [md tex]]))
@@ -78,26 +79,25 @@
    :dt    (* sigma dx)})
 
 ^:kindly/hide-code
-(def spatial-arr (two-d/create-2d-spacial-array
+(def spatial-arr (two-d/create-array-2d
                    {:nx nx :x-start 0 :x-end 2
                     :ny ny :y-start 0 :y-end 2}))
 
 ^:kindly/hide-code
-(def array-u (two-d/create-init-u (merge init-params spatial-arr)))
-
+(def array-u (two-d/create-init-u init-params spatial-arr))
 ;; We plot here using plotly, then using `:mesh3d` as the type of the plot.
 ;; And here's [a reference doc](https://scicloj.github.io/kindly-noted/kinds.html#plotly) from kindly notebook.
 ;; The plotting data formats goes like:
 
 ^:kindly/hide-code
 (defn arr->plotly-plottable-data
-  [{:keys [array-x array-y array-u]}]
+  [array-u [array-x array-y]]
   {:x (apply concat (repeat (alength array-y) array-x))
    :y (apply concat (map #(repeat (alength array-x) %) array-y))
    :z (apply concat array-u)})
 
 ^:kindly/hide-code
-(def plotly-plottable-data (arr->plotly-plottable-data (assoc spatial-arr :array-u array-u)))
+(def plotly-plottable-data (arr->plotly-plottable-data array-u spatial-arr))
 
 ^:kindly/hide-code
 (-> plotly-plottable-data
@@ -124,7 +124,7 @@
 ;;
 ;;
 ^:kindly/hide-code
-(let [convection-u   (two-d/simulate array-u init-params)
-      plottable-data (arr->plotly-plottable-data (assoc spatial-arr :array-u convection-u))]
+(let [{:keys [array-u]} (two-d/simulate {:array-u array-u} init-params)
+      plottable-data (arr->plotly-plottable-data array-u spatial-arr)]
   (kind/plotly
     {:data [(merge plottable-data plotly-opts)]}))

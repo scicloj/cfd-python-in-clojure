@@ -49,6 +49,8 @@ with states of its density, pressure and temperature.
 
 * [Step 5- 2-D Linear Convection](steps.step_05.html)
 
+* [Step 6- 2-D Nonlinear Convection](steps.step_06.html)
+
 
 ```{=html}
 <div style="background-color:grey;height:2px;width:100%;"></div>

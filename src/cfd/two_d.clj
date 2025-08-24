@@ -13,10 +13,13 @@
    :array-y (dt/make-container dt-type
               (num-clj/linspace {:start y-start :stop y-end :num ny}))})
 
-(defn create-2d-spacial-array [{:keys [nx x-start x-end
-                                       ny y-start y-end]}]
-  {:array-x (num-clj/linspace {:start x-start :stop x-end :num nx})
-   :array-y (num-clj/linspace {:start y-start :stop y-end :num ny})})
+(defn create-array-2d
+  "Create a 2-dimensional array of Objects that contains
+  array-x and array-y"
+  [{:keys [nx x-start x-end
+           ny y-start y-end]}]
+  (to-array-2d [(num-clj/linspace {:start x-start :stop x-end :num nx})
+                (num-clj/linspace {:start y-start :stop y-end :num ny})]))
 
 (defn- default-condition-fn
   "Given x-val and y-val, creates initial flow velocity
@@ -29,8 +32,9 @@
 
 (defn create-init-u
   "Create u(flow velocity) for x, y grid"
-  [{:keys [nx ny array-x array-y condition-fn]
-    :or {condition-fn default-condition-fn}}]
+  [{:keys [nx ny condition-fn]
+    :or   {condition-fn default-condition-fn}}
+   [array-x array-y]]
   (let [array-x-len     (or nx (alength array-x))
         array-y-len     (or ny (alength array-y))
         spatial-array-u (make-array Float/TYPE array-x-len array-y-len)]
@@ -44,9 +48,9 @@
     spatial-array-u))
 
 (defn- update-convection-u
-  [array-u {:keys [c dx dy dt nx ny]
-            :or   {c 1.0}
-            :as   params}]
+  [{:keys [array-u]} {:keys [c dx dy dt nx ny]
+                      :or   {c 1.0}
+                      :as   params}]
   (let [un (object-array array-u)]
     (dotimes [y-idx (- ny 1)]
       (when (pos? y-idx)
@@ -72,6 +76,54 @@
      (aset array-u y-idx (dec nx) (float 1))))
   array-u)
 
+(defn- update-nonlinear-convection-u
+  [{:keys [array-u array-v]} {:keys [dx dy dt nx ny]
+                              :as   params}]
+  (let [un (object-array array-u)
+        vn (object-array array-v)]
+    (dotimes [y-idx (- ny 1)]
+      (when (pos? y-idx)
+        (dotimes [x-idx (- nx 1)]
+          (when (pos? x-idx)
+            (let [u-j-i   (aget un y-idx x-idx)
+                  u-j-i-1 (aget un y-idx (dec x-idx))
+                  u-j-1-i (aget un (dec y-idx) x-idx)
+                  v-j-i   (aget vn y-idx x-idx)
+                  v-j-i-1 (aget vn y-idx (dec x-idx))
+                  v-j-1-i (aget vn (dec y-idx) x-idx)]
+              (aset array-u y-idx x-idx
+                (float (- u-j-i
+                          (* u-j-i
+                             (/ dt dx)
+                             (- u-j-i u-j-i-1))
+                          (* v-j-i
+                             (/ dt dy)
+                             (- u-j-i u-j-1-i)))))
+              (aset array-v y-idx x-idx
+                (float (- v-j-i
+                          (* u-j-i
+                             (/ dt dx)
+                             (- v-j-i v-j-i-1))
+                          (* v-j-i
+                             (/ dt dy)
+                             (- v-j-i v-j-1-i))))))))))
+    ;; boundary condition
+    (aset array-u 0 (float-array nx 1))
+    (aset array-u (dec ny) (float-array nx 1))
+    (dotimes [y-idx (- ny 1)]
+      (aset array-u y-idx 0 (float 1))
+      (aset array-u y-idx (dec nx) (float 1)))
+    ;; boundary condition for v
+    (aset array-v 0 (float-array nx 1))
+    (aset array-v (dec ny) (float-array nx 1))
+    (dotimes [y-idx (- ny 1)]
+      (aset array-v y-idx 0 (float 1))
+      (aset array-v y-idx (dec nx) (float 1))))
+  {:array-u array-u
+   :array-v array-v})
+
+
+
 (defn simulate
   "Runs the simulation for nt time steps.
 
@@ -80,12 +132,14 @@
   - params: a map containing simulation parameters (including :nt and :dt)
 
   Returns the final u array after nt updates"
-  [array-u {:keys [nt mode]
-            :or   {mode :convection}
-            :as   params}]
+  [{:keys [array-u array-v] :as vel-arr-vec}
+   {:keys [nt mode]
+    :or   {mode :convection}
+    :as   params}]
   (let [update-fn (case mode
-                    :convection update-convection-u)]
+                    :convection update-convection-u
+                    :nonlinear-convection update-nonlinear-convection-u)]
     (loop [n 0]
       (if (= n nt)
-        array-u
-        (do (update-fn array-u params) (recur (inc n)))))))
+        vel-arr-vec
+        (do (update-fn vel-arr-vec params) (recur (inc n)))))))
