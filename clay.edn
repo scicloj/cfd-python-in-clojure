@@ -3,4 +3,4 @@
  :quarto           {:format {:html {:toc       true
                                     :toc-depth 4
                                     :theme     [:cosmo "notebooks/custom.scss"]}}}
- :base-target-path "temp"}
+ :base-target-path "docs"}

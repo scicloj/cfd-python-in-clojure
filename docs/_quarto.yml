@@ -1,0 +1,10 @@
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    theme: [cosmo, notebooks/custom.scss]
+  revealjs: {theme: solarized, navigation-mode: vertical, transition: slide, background-transition: fade, incremental: true}
+project: {type: book}
+book:
+  chapters: [index.qmd, steps.step_01.qmd, steps.step_02.qmd, steps.cfl_condition.qmd, steps.step_03.qmd, steps.step_04.qmd, steps.step_05.qmd, steps.step_06.qmd, steps.step_07.qmd, steps.step_08.qmd]
+  title: CFD Python in Clojure

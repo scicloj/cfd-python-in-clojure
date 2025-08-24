@@ -1,0 +1,192 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "CFD Python in Clojure",
+    "section": "",
+    "text": "1 CFD Python in Clojure\nWe attempt to convert Python written 12 steps of Navier-Stokes learning modules into Clojure. By doing so, the objectives are: 1. going through the steps to learn Computational Fluid Dynamics(CFD) in general 2. convert Python written functions into Clojure, so we could further evolve it to make it use-able in related science research in the future",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>CFD Python in Clojure</span>"
+    ]
+  },
+  {
+    "objectID": "index.html#navier-stokes-equations",
+    "href": "index.html#navier-stokes-equations",
+    "title": "CFD Python in Clojure",
+    "section": "1.1 Navier-Stokes equations",
+    "text": "1.1 Navier-Stokes equations\nNavier-Stokes equations basically describes the movement of viscous fluids using partial differential equations(PDE).\nIn general, the equations explains who fluids reacts around given environment, with states of its density, pressure and temperature.",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>CFD Python in Clojure</span>"
+    ]
+  },
+  {
+    "objectID": "index.html#steps",
+    "href": "index.html#steps",
+    "title": "CFD Python in Clojure",
+    "section": "1.2 Steps",
+    "text": "1.2 Steps\n\nStep 1 - 1-D Linear Convection\nStep 2 - Nonlinear Convection\nConvergence and the CFL Condition\nStep 3 - 1-D Diffusion Equation\nStep 4- 1-D Burgers’ Equation\nStep 5- 2-D Linear Convection Equation\nStep 6- 2-D Nonlinear Convection Equation\nStep 7- 2-D Diffusion Equation\nStep 8- 2-D Burgers’ Equation\n\n\nsource: notebooks/index.clj",
+    "crumbs": [
+      "<span class='chapter-number'>1</span>  <span class='chapter-title'>CFD Python in Clojure</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_01.html",
+    "href": "steps.step_01.html",
+    "title": "2  1-D Linear Convection",
+    "section": "",
+    "text": "2.1 What is Convection\nTo briefly describe, convection is like movement affected by the fluid flow itself.",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>1-D Linear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_01.html#the-equation",
+    "href": "steps.step_01.html#the-equation",
+    "title": "2  1-D Linear Convection",
+    "section": "2.2 The Equation",
+    "text": "2.2 The Equation\n\\[\\frac{\\partial u }{\\partial t} + c \\frac{\\partial u}{\\partial x} = 0\\]\n\n\\(c\\): speed of initial wave\nInitial condition(at the time \\(t = 0\\), the velocity of the flow, and here it’s understood as a wave) denotes as \\(u_0\\):\n\n\\[u(x, 0) = u_0(x)\\]\nThen the exact solution of the linear convection equation:\n\\[u(x, t) = u_0(x - ct)\\]\nWe discretize this equation in both space and time, using the Forward difference scheme for the time derivative and the Backward difference scheme for the space derivative from the definition of a derivative,\nConsider discretizing the spatial coordinate \\(x\\) into points that we index from \\(i = 0\\) to \\(N\\), and stepping in discrete time intervals of size \\(\\Delta t\\)\n\\[\\frac{\\partial u}{\\partial x} \\approx \\frac{u(x + \\Delta x) - u(x)}{\\Delta x}\\]\ndiscrete equation follows:\n\\[\\frac{u_i^{n+1} - u_i^n}{\\Delta t} + c \\frac{u_i^n - u_{i-1}^n}{\\Delta x} = 0\\]\n\n\\(n\\) & \\(n + 1\\): two consecutive steps in time\n\\(i - 1\\) & \\(i\\): two neighboring points of the discretized x coordinate We can solve for our unknown to get an equation that allows us to advance in time, as follows:\n\n\\[u_i^{n+1} = n_i^n - c \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n)\\]",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>1-D Linear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_01.html#implementation",
+    "href": "steps.step_01.html#implementation",
+    "title": "2  1-D Linear Convection",
+    "section": "2.3 Implementation",
+    "text": "2.3 Implementation\nnx: steps (= 41) dx = 2 / (nx - 1) (x-start = 0, x-end = 2) nt: the number of timesteps we want to calculate (= 25) dt: the amount of time each timestep covers (delta t) (= .25) c: wave speed (= 1)\ninitial conditions: 1. initial velocity \\(u_0\\) is given as \\(u = 2\\) in the interval \\(0.5 \\le x \\le 1\\) and \\(u = 1\\) everywhere else in \\((0, 2)\\)\narray-u outputs:\n\n[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0,\n 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,\n 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]\n\n\ntime to implement discretization of the convention equation using a finite-difference scheme\n\n(def params {:x-start 0\n             :x-end   2\n             :nx      41\n             :nt      20\n             :c       1.0\n             :dt      0.025})\n\n\n(def array-x (one-d/create-array-x params))\n\n\n(def array-u (one-d/create-array-u {:array-x array-x}))\n\n\n(let [nx      41\n      array-x (one-d/create-array-x {:nx nx})\n      array-u (one-d/create-array-u {:array-x array-x})\n      u       (one-d/simulate array-u params)]\n  (kind/vega-lite\n    {:mark     \"line\"\n     :width    500 :height 300\n     :encoding {:x {:field \"x\" :type \"quantitative\"}\n                :y {:field \"y\" :type \"quantitative\"}}\n     :data     {:values (into [] (map #(hash-map :x % :y %2) array-x u))}}))\n\n\n\nsource: notebooks/steps/step_01.clj",
+    "crumbs": [
+      "<span class='chapter-number'>2</span>  <span class='chapter-title'>1-D Linear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_02.html",
+    "href": "steps.step_02.html",
+    "title": "3  Nonlinear Convection",
+    "section": "",
+    "text": "3.1 Implementations\nGoing to implement nonlinear convection in 1D:\n\\[\\frac{\\partial u }{\\partial t} + u \\frac{\\partial u}{\\partial x} = 0\\]\ndifference: instead of a constant \\(c\\), we’re multiplying the solution \\(u\\) onto the second term\nThen the discretized equation is:\n\\[\\frac{u_i^{n+1} - u_i^n}{\\Delta t} + u_i^n \\frac{u_i^n - u_{i-1}^n}{\\Delta x} = 0\\]\nThen, solving for \\(u_i^{n+1}\\):\n\\[u_i^{n+1} = u_i^n - u_i^n \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n)\\]",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Nonlinear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_02.html#implementations",
+    "href": "steps.step_02.html#implementations",
+    "title": "3  Nonlinear Convection",
+    "section": "",
+    "text": "(def init-params {:x-start 0\n                  :x-end   2\n                  :nx      41\n                  :nt      20\n                  :dt      0.025\n                  :co-eff  :nonlinear})\n\n\n\nsource: notebooks/steps/step_02.clj",
+    "crumbs": [
+      "<span class='chapter-number'>3</span>  <span class='chapter-title'>Nonlinear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.cfl_condition.html",
+    "href": "steps.cfl_condition.html",
+    "title": "4  Convergence and the CFL Condition",
+    "section": "",
+    "text": "4.1 Reasons for the breakage\ninitial and boundary conditions:\n41 points of grid and 0.025 sec of timestep.\nExperimenting increasing the size of the grid below to see what happens:\n\\(nx = 41\\)\n\\(nx = 61\\)\n\\(nx = 81\\)\nincreasing grid size means travelling distance within a \\(\\Delta t\\) becomes grater than \\(\\Delta x\\), which correlates to \\(nx\\). In order to enforce the stability, we introduce Courant number \\(\\sigma_{max}\\). This ensures stability with given discretization params.\n\\[\\sigma = \\frac{u \\Delta t}{\\Delta x} \\le \\sigma_{max}\\]\n\\(nx = 41\\)\n\\(nx = 61\\)\n\\(nx = 81\\)\n\\(nx = 101\\)\n\\(nx = 121\\)\nThe results show with a grid size \\(nx\\) increases, convection travels shorter distance. With a given \\(nt = 20\\) in the init param, the time windows becomes shorter as a result of increasing \\(nx\\).",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Convergence and the CFL Condition</span>"
+    ]
+  },
+  {
+    "objectID": "steps.cfl_condition.html#reasons-for-the-breakage",
+    "href": "steps.cfl_condition.html#reasons-for-the-breakage",
+    "title": "4  Convergence and the CFL Condition",
+    "section": "",
+    "text": "(def init-params' {:x-start 0\n                   :x-end   2\n                   :nx      41\n                   :nt      20\n                   :c       1.0\n                   :sigma   0.5})\n\n\n\n\n\n\n\n\n\n\n\n\n\nsource: notebooks/steps/cfl_condition.clj",
+    "crumbs": [
+      "<span class='chapter-number'>4</span>  <span class='chapter-title'>Convergence and the CFL Condition</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_03.html",
+    "href": "steps.step_03.html",
+    "title": "5  1-D Diffusion Equation",
+    "section": "",
+    "text": "5.1 Discretizing \\(\\frac{\\partial^2 u}{\\partial x^2}\\)\nThe diffusion equation in 1D is:\n\\[\\frac{\\partial u}{\\partial t} = \\nu \\frac{\\partial^2 u}{\\partial x^2}\\]\nThe equation has second-order derivative, which we first learn how to implement in the code. \\(\\nu\\) is the value of viscosity.\nDescretizing the second-order derivative w/ the Central Difference Scheme: a combination of Forward Difference and Backward Difference of the first derivative.\n\\[u_{i+1} = u_i + \\Delta x \\frac{\\partial u}{\\partial x}\\bigg|_i + \\frac{\\Delta x^2}{2} \\frac{\\partial ^2 u}{\\partial x^2}\\bigg|_i + \\frac{\\Delta x^3}{3!} \\frac{\\partial ^3 u}{\\partial x^3}\\bigg|_i + O(\\Delta x^4)\\]\n\\[u_{i-1} = u_i - \\Delta x \\frac{\\partial u}{\\partial x}\\bigg|_i + \\frac{\\Delta x^2}{2} \\frac{\\partial ^2 u}{\\partial x^2}\\bigg|_i - \\frac{\\Delta x^3}{3!} \\frac{\\partial ^3 u}{\\partial x^3}\\bigg|_i + O(\\Delta x^4)\\]\nNeglecting \\(O(\\Delta x^4)\\) or higher(very small, so neglect-able..)\n\\[u_{i+1} + u_{i_1} = 2u_i + \\Delta x^2 \\frac{\\partial^2 u}{\\partial x^2}\\bigg|_i\\]\nthen put it together w/ the diffusion equation:\n\\[\\frac{u_i^{n+1} - u_i^n}{\\Delta t} = \\nu\\frac{u_{i+1}^n + u_{i-1}^n - 2u_i^n}{\\Delta x^2}\\]\nthen programmatic equation to solve \\(u\\) is:\n\\[u_i^{n+1} = \\nu\\frac{\\Delta t}{\\Delta x^2}(n_{i+1}^n + u_{i-1}^n - 2u_i^n) + u_i^n\\]",
+    "crumbs": [
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>1-D Diffusion Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_03.html#discretizing-fracpartial2-upartial-x2",
+    "href": "steps.step_03.html#discretizing-fracpartial2-upartial-x2",
+    "title": "5  1-D Diffusion Equation",
+    "section": "",
+    "text": "(def init-params\n  {:mode  :diffusion\n   :nx    42\n   :nt    20\n   :nu    0.3\n   :sigma 0.2})\n\n\n\nsource: notebooks/steps/step_03.clj",
+    "crumbs": [
+      "<span class='chapter-number'>5</span>  <span class='chapter-title'>1-D Diffusion Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_04.html",
+    "href": "steps.step_04.html",
+    "title": "6  1-D Burgers’ Equation",
+    "section": "",
+    "text": "6.1 Initials & Boundary Conditions\nA fundamental PDE & convection-diffusion equation.\n\\[\\frac{\\partial u}{\\partial t} + u \\frac{\\partial u}{\\partial x} = \\nu\\frac{\\partial^2 u}{\\partial x^2}\\]\nPreviously, convection eq’n:\n\\[\\frac{\\partial u}{\\partial t} + u\\frac{\\partial u}{\\partial x} = 0\\]\nand diffusion eq’n:\n\\[\\frac{\\partial u}{\\partial t} = \\nu\\frac{\\partial^2 u}{\\partial x^2}\\]\ncombining discretized equations from previous steps\n\\[\\frac{u_i^{n+1} - u_i^n}{\\Delta t} + u_i^n\\frac{u_i^n - u_{i-1}^n}{\\Delta x} = \\nu\\frac{u_{i+1}^n + u_{i-1}^n - 2u_i^n}{\\Delta x^2}\\]\nrearranging the above results:\n\\[u_i^{n+1} = u_i^n - u_i^n \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n) + \\nu\\frac{\\Delta t}{\\Delta x^2}(u_{i+1}^n + u_{i-1}^n - 2u_i^n)\\]",
+    "crumbs": [
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>1-D Burgers' Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_04.html#initials-boundary-conditions",
+    "href": "steps.step_04.html#initials-boundary-conditions",
+    "title": "6  1-D Burgers’ Equation",
+    "section": "",
+    "text": "6.1.1 Initial Conditions\n\\[u = -\\frac{2\\nu}{\\phi}\\frac{\\partial \\phi}{\\partial x} + 4\\]\n\\[\\phi = \\exp\\bigg(\\frac{-(x - 4t)^2}{4\\nu(t + 1)}\\bigg) + \\exp\\bigg(\\frac{-(x - 4t - 2\\pi)^2}{4\\nu(t + 1)}\\bigg)\\]\n\n\n6.1.2 Boundary Condition\n\\[u(0) = u(2\\pi)\\]\nThis is called a periodic boundary condition.\nTesting Burgers’ Eqn: note: currently not using adding equation very organically, so we need to refactor.\n\n(one-d/burgers-u {:t 1.0 :x 4.0 :nu 3.0})\n\n\n3.4917066\n\nWorking on generating lambdify-ed function:\n\n(def nx 101)\n\n\n(def nt 100)\n\n\n(def nu 0.07)\n\n\n(def dx (* 2.0 PI (/ 1 (- nx 1))))\n\n\n(def dt (* dx nu))\n\n\n(def x-start 0)\n\n\n(def x-end (* 2.0 PI))\n\n\n(def init-params\n  {:nx      nx\n   :dx      dx\n   :nt      nt\n   :x-start x-start\n   :x-end   x-end\n   :nu      nu\n   :dt      dt\n   :mode    :burger})\n\nCalculate u and plot:\n\n[3.982484, 4.0450406, 4.1075974, 4.170154, 4.232711, 4.2952676,\n 4.3578243, 4.420381, 4.482938, 4.5454946, 4.6080513, 4.670608,\n 4.733165, 4.7957215, 4.8582783, 4.920835, 4.983392, 5.045948,\n 5.108505, 5.1710615, 5.2336183, 5.296175, 5.3587317, 5.4212885,\n 5.483845, 5.546402, 5.6089587, 5.6715155, 5.734072, 5.796629,\n 5.8591857, 5.9217424, 5.984299, 6.0468554, 6.109412, 6.171969,\n 6.2345257, 6.2970824, 6.359639, 6.422196, 6.4847527, 6.5473094,\n 6.609866, 6.672423, 6.734979, 6.797534, 6.860055, 6.9220233,\n 6.9748416, 6.880349, 5.152262, 1.6489367, 1.0293779, 1.0453354,\n 1.1050574, 1.1674429, 1.2299894, 1.2925454, 1.3551022, 1.4176589,\n 1.4802157, 1.5427722, 1.6053289, 1.6678857, 1.7304426, 1.7929994,\n 1.8555557, 1.9181124, 1.9806691, 2.0432258, 2.1057825, 2.1683393,\n 2.230896, 2.2934527, 2.3560095, 2.4185662, 2.481123, 2.5436797,\n 2.6062365, 2.6687932, 2.73135, 2.7939067, 2.8564634, 2.9190202,\n 2.9815764, 3.0441332, 3.10669, 3.1692467, 3.2318034, 3.2943602,\n 3.356917, 3.4194736, 3.4820304, 3.5445871, 3.6071439, 3.6697006,\n 3.7322574, 3.794814, 3.8573709, 3.9199276, 3.9824843]\n\n\n^^“saw-tooth function”",
+    "crumbs": [
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>1-D Burgers' Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_04.html#periodic-boundary-conditions",
+    "href": "steps.step_04.html#periodic-boundary-conditions",
+    "title": "6  1-D Burgers’ Equation",
+    "section": "6.2 Periodic Boundary Conditions",
+    "text": "6.2 Periodic Boundary Conditions\nWith periodic boundary conditions, when a point gets to the right-hand side of the frame, it wraps around back to the front of the frame.\nBringing the discretized equation from the above:\n\\[u_i^{n+1} = u_i^n - u_i^n \\frac{\\Delta t}{\\Delta x}(u_i^n - u_{i-1}^n) + \\nu\\frac{\\Delta t}{\\Delta x^2}(u_{i+1}^n + u_{i-1}^n - 2u_i^n)\\]\nDrawing both analytical and computational results in the same plot:\n\n\nsource: notebooks/steps/step_04.clj",
+    "crumbs": [
+      "<span class='chapter-number'>6</span>  <span class='chapter-title'>1-D Burgers' Equation</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_05.html",
+    "href": "steps.step_05.html",
+    "title": "7  Step 5: 2-D Linear Convection",
+    "section": "",
+    "text": "Expanding from 1D to 2D. Following exercises extends firstly to 2D. The expansion simply requires to apply the definition: a partial derivative with respect to \\(x\\) is the variation in the \\(x\\) direction at constant \\(y\\).\nIn 2D space, a rectangular(uniform) grid is defined by the points with coordinates:\n\\[x_i = x_0 + i \\Delta x\\]\n\\[y_i = y_0 + i \\Delta y\\]\nThen also define $u_{i,j} = u(x_i, y_j) and apply the finite-difference formulas on either variable \\(x, y\\) acting separately on the \\(i\\) and \\(j\\) indices. All derivatives are based on the 2D Taylor expansion of a mesh point value around \\(u_{ij}\\)\nHence, for a first-order partial derivative in the x-direction, a finite-difference formula is:\n\\[\\frac{\\partial u}{\\partial x}\\biggr\\rvert_{i,j} = \\frac{u_{i+1,j}-u_{i,j}}{\\Delta x}+\\mathcal{O}(\\Delta x)\\]\nand similarly in the \\(y\\) direction. Thus, we can write backward-difference, forward-difference or central difference formulas for Step 5 to 12.\nThe PDE governing 2-D Linear Convection is written as\n\\[\\frac{\\partial u}{\\partial t}+c\\frac{\\partial u}{\\partial x} + c\\frac{\\partial u}{\\partial y} = 0\\]\nThis is the same form in 1-D, then added one more dimension to account for as we step forward in time.\nWe will use: - a forward difference discretization for the timestep - a backward difference discretization for two spatial steps\nWith 1-D implementations, we used \\(i\\) subscripts to denote movement in space (e.g. \\(u_i^n - u_{i-1}^n\\)). Now that we have two dimensions to account for, we need to add a second subscript, \\(j\\), to account for all the information in the regime.\nHere, we’ll again use \\(i\\) as the index for our \\(x\\) values, and we’ll add the \\(j\\) subscript to track our \\(y\\) values.\nWith that in mind, our discretization of the PD should be relatively straightforward.\n\\[\\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\\Delta t} + c\\frac{u_{i, j}^n-u_{i-1,j}^n}{\\Delta x} + c\\frac{u_{i,j}^n-u_{i,j-1}^n}{\\Delta y}=0\\]\nAs before, solve for the only unknown:\n\\[u_{i,j}^{n+1} = u_{i,j}^n-c \\frac{\\Delta t}{\\Delta x}(u_{i,j}^n-u_{i-1,j}^n)-c \\frac{\\Delta t}{\\Delta y}(u_{i,j}^n-u_{i,j-1}^n)\\]\nWe will solve this equation with the following initial conditions:\n\\[u(x,y) = \\begin{cases}\n\\begin{matrix}\n2\\ \\text{for} & 0.5 \\leq x, y \\leq 1 \\cr\n1\\ \\text{for} & \\text{everywhere else}\\end{matrix}\\end{cases}\\]\nand the boundary conditions:\n\\[u = 1\\ \\text{for } \\begin{cases}\n\\begin{matrix}\nx =  0,\\ 2 \\cr\ny =  0,\\ 2 \\end{matrix}\\end{cases}\\]\nWe plot here using plotly, then using :mesh3d as the type of the plot. And here’s a reference doc from kindly notebook. The plotting data formats goes like:\n\n_unnamed [6561 3]:\n\n\n\n:x\n:y\n:z\n\n\n\n\n0.000\n0.0\n1.0\n\n\n0.025\n0.0\n1.0\n\n\n0.050\n0.0\n1.0\n\n\n…\n…\n…\n\n\n1.925\n2.0\n0.0\n\n\n1.950\n2.0\n0.0\n\n\n1.975\n2.0\n0.0\n\n\n2.000\n2.0\n0.0\n\n\n\n\ninitial plotting goes:\n\nnote: for now, we skip 3d plotting notes from PythonCFD(further TODO)\n\n7.0.1 Iterating in 2-D w/ linear convection equation\n\n\nsource: notebooks/steps/step_05.clj",
+    "crumbs": [
+      "<span class='chapter-number'>7</span>  <span class='chapter-title'>Step 5: 2-D Linear Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_06.html",
+    "href": "steps.step_06.html",
+    "title": "8  Step 6: 2-D Convection",
+    "section": "",
+    "text": "Now we solve 2D Convection, represented by the pair of coupled partial differential equations below:\n\\[\\frac{\\partial u}{\\partial t} + u \\frac{\\partial u}{\\partial x} + v \\frac{\\partial u}{\\partial y} = 0\\]\n\\[\\frac{\\partial v}{\\partial t} + u \\frac{\\partial v}{\\partial x} + v \\frac{\\partial v}{\\partial y} = 0\\]\nDescretizing these equations using the methods we’ve applied previously yields:\n\\[\\frac{u_{i,j}^{n+1}-u_{i,j}^n}{\\Delta t} + u_{i,j}^n \\frac{u_{i,j}^n-u_{i-1,j}^n}{\\Delta x} + v_{i,j}^n \\frac{u_{i,j}^n-u_{i,j-1}^n}{\\Delta y} = 0\\]\n\\[\\frac{v_{i,j}^{n+1}-v_{i,j}^n}{\\Delta t} + u_{i,j}^n \\frac{v_{i,j}^n-v_{i-1,j}^n}{\\Delta x} + v_{i,j}^n \\frac{v_{i,j}^n-v_{i,j-1}^n}{\\Delta y} = 0\\]\nRearranging both equations, we solve for \\(u_{i,j}^{n+1}\\) and \\(v_{i,j}^{n+1}\\), respectively. Note that these equations are also coupled.\n\\[u_{i,j}^{n+1} = u_{i,j}^n - u_{i,j} \\frac{\\Delta t}{\\Delta x} (u_{i,j}^n-u_{i-1,j}^n) - v_{i,j}^n \\frac{\\Delta t}{\\Delta y} (u_{i,j}^n-u_{i,j-1}^n)\\]\n\\[v_{i,j}^{n+1} = v_{i,j}^n - u_{i,j} \\frac{\\Delta t}{\\Delta x} (v_{i,j}^n-v_{i-1,j}^n) - v_{i,j}^n \\frac{\\Delta t}{\\Delta y} (v_{i,j}^n-v_{i,j-1}^n)\\]\n\n8.0.1 Initial Conditions\nThe initial conditions are the same that we used for 1D convection, applied in both the \\(x\\) and \\(y\\) directions.\n\\[u,\\ v\\ = \\begin{cases}\\begin{matrix}\n2 & \\text{for } x,y \\in (0.5, 1)\\times(0.5,1) \\cr\n1 & \\text{everywhere else}\n\\end{matrix}\\end{cases}\\]\n\n\n8.0.2 Boundary Conditions\nThe boundary conditions hold \\(u\\) and \\(v\\) equal to 1 along the boundaries of the grid.\n\\[u = 1,\\ v = 1 \\text{ for } \\begin{cases} \\begin{matrix}x=0,2\\cr y=0,2 \\end{matrix}\\end{cases}\\]\nnumber of x grid points\n\n(def nx 101)\n\nnumber of y grid points\n\n(def ny 101)\n\nnumber of time steps\n\n(def nt 80)\n\nCFL number\n\n(def sigma 0.2)\n\nDefine initial parameters\n\n(def init-params\n  {:nx    nx\n   :ny    ny\n   :nt    nt\n   :c     1\n   :dx    (/ 2 (- nx 1))\n   :dy    (/ 2 (- ny 1))\n   :sigma sigma\n   :dt    (* sigma (/ 2 (- nx 1)))})\n\nCreate the spatial grid\n\n(def grid-start 0)\n\n\n(def grid-end 2)\n\n\n(def spatial-arr (two-d/create-array-2d\n                   (assoc init-params\n                     :x-start grid-start :x-end grid-end\n                     :y-start grid-start :y-end grid-end)))\n\nCreate the initial u and v arrays\n\n(def array-u (two-d/create-init-u init-params spatial-arr))\n\n\n(def array-v (two-d/create-init-u init-params spatial-arr))\n\n\n_unnamed [10201 3]:\n\n\n\n:x\n:y\n:z\n\n\n\n\n0.00\n0.0\n1.0\n\n\n0.02\n0.0\n1.0\n\n\n0.04\n0.0\n1.0\n\n\n…\n…\n…\n\n\n1.94\n2.0\n0.0\n\n\n1.96\n2.0\n0.0\n\n\n1.98\n2.0\n0.0\n\n\n2.00\n2.0\n0.0\n\n\n\n\ninitial plotting w/ \\(x\\), \\(y\\), \\(u\\) goes:\n\n\n\n8.0.3 Iterating in 2-D w/ nonlinear convection equation\nu\n\n(two-d/sim-&gt;plotly-plot-it! spatial-arr (:array-u simulated-result))\n\n\nv\n\n(two-d/sim-&gt;plotly-plot-it! spatial-arr (:array-v simulated-result))\n\n\n\nsource: notebooks/steps/step_06.clj",
+    "crumbs": [
+      "<span class='chapter-number'>8</span>  <span class='chapter-title'>Step 6: 2-D Convection</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_07.html",
+    "href": "steps.step_07.html",
+    "title": "9  Step 7: 2-D Diffusion",
+    "section": "",
+    "text": "And here is the 2D-diffusion equation:\n\\[\\frac{\\partial u}{\\partial t} = \\nu \\frac{\\partial ^2 u}{\\partial x^2} + \\nu \\frac{\\partial ^2 u}{\\partial y^2}\\]\nYou will recall that we came up with a method for discretized second order derivatives in Step 3, when investigating 1-D diffusion. We are going to use the same scheme here, with our forward difference in time and two second-order derivatives.\n\\[\\frac{u_{i,j}^{n+1} - u_{i,j}^n}{\\Delta t} = \\nu \\frac{u_{i+1,j}^n - 2 u_{i,j}^n + u_{i-1,j}^n}{\\Delta x^2} + \\nu \\frac{u_{i,j+1}^n-2 u_{i,j}^n + u_{i,j-1}^n}{\\Delta y^2}\\]\nOnce again, we reorganize the discretized equation and solve for \\(u_{ij}^{n+1}\\)\n\\[\\begin{split}\nu_{i,j}^{n+1} = u_{i,j}^n &+ \\frac{\\nu \\Delta t}{\\Delta x^2}(u_{i+1,j}^n - 2 u_{i,j}^n + u_{i-1,j}^n) \\\\\n&+ \\frac{\\nu \\Delta t}{\\Delta y^2}(u_{i,j+1}^n-2 u_{i,j}^n + u_{i,j-1}^n)\n\\end{split}\\]\n\n9.0.1 Initial Conditions\n\n(def nx 31)\n\n\n(def ny 31)\n\n\n(def nt 10)\n\nviscosity\n\n(def nu 0.05)\n\nCFL number\n\n(def sigma 0.2)\n\n\n(def dx (/ 2 (- nx 1)))\n\n\n(def dy (/ 2 (- ny 1)))\n\n\n(def init-params\n  {:nx    nx\n   :ny    ny\n   :nu    nu\n   :nt    nt\n   :sigma sigma\n   :dx    dx\n   :dy    dy\n   :dt    (* sigma dx dy (/ 1 nu))})\n\nCreate spatial grid\n\n(def grid-start 0)\n\n\n(def grid-end 2)\n\n\n(def spatial-arr (two-d/create-array-2d\n                   (assoc init-params\n                     :x-start grid-start :x-end grid-end\n                     :y-start grid-start :y-end grid-end)))\n\nCreate the initial u with the initial condition:\n\\[u(x,y) = \\begin{cases}\n\\begin{matrix}\n2\\ \\text{for} & 0.5 \\leq x, y \\leq 1 \\cr\n1\\ \\text{for} & \\text{everywhere else}\\end{matrix}\\end{cases}\\]\n\n(def array-u (two-d/create-init-u init-params spatial-arr))\n\ninitial plotting goes:\n\n\n\n9.0.2 Iterating in 2-D w/ diffusion equation\nat \\(nt=10\\)\n\nat \\(nt=14\\)\n\nat \\(nt=50\\)\n\n\nsource: notebooks/steps/step_07.clj",
+    "crumbs": [
+      "<span class='chapter-number'>9</span>  <span class='chapter-title'>Step 7: 2-D Diffusion</span>"
+    ]
+  },
+  {
+    "objectID": "steps.step_08.html",
+    "href": "steps.step_08.html",
+    "title": "10  Step 8: 2-D Burgers’ Equation",
+    "section": "",
+    "text": "Remember, Burgers’ equations can generate discontinuous solutions from an initial condition that is smooth, i.e., can develop “shocks”. We want to see this in two dimensions now!\nHere is our coupled set of PDEs:\n\\[\\frac{\\partial u}{\\partial t} + u \\frac{\\partial u}{\\partial x} + v \\frac{\\partial u}{\\partial y} = \\nu \\; \\left(\\frac{\\partial ^2 u}{\\partial x^2} + \\frac{\\partial ^2 u}{\\partial y^2}\\right)\\]\n\\[\\frac{\\partial v}{\\partial t} + u \\frac{\\partial v}{\\partial x} + v \\frac{\\partial v}{\\partial y} = \\nu \\; \\left(\\frac{\\partial ^2 v}{\\partial x^2} + \\frac{\\partial ^2 v}{\\partial y^2}\\right)\\]\nWe know how to discretize each term: we’ve already done it before!\n\\[\\begin{split}\n& \\frac{u_{i,j}^{n+1} - u_{i,j}^n}{\\Delta t} + u_{i,j}^n \\frac{u_{i,j}^n-u_{i-1,j}^n}{\\Delta x} + v_{i,j}^n \\frac{u_{i,j}^n - u_{i,j-1}^n}{\\Delta y} = \\\\\n& \\qquad \\nu \\left( \\frac{u_{i+1,j}^n - 2u_{i,j}^n+u_{i-1,j}^n}{\\Delta x^2} + \\frac{u_{i,j+1}^n - 2u_{i,j}^n + u_{i,j-1}^n}{\\Delta y^2} \\right)\n\\end{split}\\]\n\\[\\begin{split}\n& \\frac{v_{i,j}^{n+1} - v_{i,j}^n}{\\Delta t} + u_{i,j}^n \\frac{v_{i,j}^n-v_{i-1,j}^n}{\\Delta x} + v_{i,j}^n \\frac{v_{i,j}^n - v_{i,j-1}^n}{\\Delta y} = \\\\\n& \\qquad \\nu \\left( \\frac{v_{i+1,j}^n - 2v_{i,j}^n+v_{i-1,j}^n}{\\Delta x^2} + \\frac{v_{i,j+1}^n - 2v_{i,j}^n + v_{i,j-1}^n}{\\Delta y^2} \\right)\n\\end{split}\\]\nAnd now, we will rearrange each of these equations for the only unknown: the two components \\(u\\), \\(v\\) of the solution at the next time step:\n\\[\\begin{split}\nu_{i,j}^{n+1} = & u_{i,j}^n - \\frac{\\Delta t}{\\Delta x} u_{i,j}^n (u_{i,j}^n - u_{i-1,j}^n)  - \\frac{\\Delta t}{\\Delta y} v_{i,j}^n (u_{i,j}^n - u_{i,j-1}^n) \\\\\n&+ \\frac{\\nu \\Delta t}{\\Delta x^2}(u_{i+1,j}^n-2u_{i,j}^n+u_{i-1,j}^n) + \\frac{\\nu \\Delta t}{\\Delta y^2} (u_{i,j+1}^n - 2u_{i,j}^n + u_{i,j-1}^n)\n\\end{split}\\]\n\\[\\begin{split}\nv_{i,j}^{n+1} = & v_{i,j}^n - \\frac{\\Delta t}{\\Delta x} u_{i,j}^n (v_{i,j}^n - v_{i-1,j}^n) - \\frac{\\Delta t}{\\Delta y} v_{i,j}^n (v_{i,j}^n - v_{i,j-1}^n) \\\\\n&+ \\frac{\\nu \\Delta t}{\\Delta x^2}(v_{i+1,j}^n-2v_{i,j}^n+v_{i-1,j}^n) + \\frac{\\nu \\Delta t}{\\Delta y^2} (v_{i,j+1}^n - 2v_{i,j}^n + v_{i,j-1}^n)\n\\end{split}\\]\n\n10.0.1 Initial Conditions\n\n(def nx 41)\n\n\n(def ny 41)\n\n\n(def nt 120)\n\n\n(def c 1)\n\n\n(def nu 0.01)\n\n\n(def sigma 0.0009)\n\n\n(def dx (/ 2 (- nx 1)))\n\n\n(def dy (/ 2 (- ny 1)))\n\n\n(def init-params\n  {:nx    nx\n   :ny    ny\n   :nt    nt\n   :c     c\n   :nu    nu\n   :sigma sigma\n   :dx    dx\n   :dy    dy\n   :dt    (* sigma dx dy (/ 1 nu))})\n\nCreate spatial grid\n\n(def grid-start 0)\n\n\n(def grid-end 2)\n\n\n(def spatial-arr (two-d/create-array-2d\n                   (assoc init-params\n                     :x-start grid-start :x-end grid-end\n                     :y-start grid-start :y-end grid-end)))\n\nCreate the initial u and v arrays w/ initial conditions: u(.5&lt;=x&lt;=1 && .5&lt;=y&lt;=1) is 2, else 1 v(.5&lt;=x&lt;=1 && .5&lt;=y&lt;=1) is 2, else 1\n\n(def array-u (two-d/create-init-u init-params spatial-arr))\n\n\n(def array-v (two-d/create-init-u init-params spatial-arr))\n\ninitial plotting w/ \\(x\\), \\(y\\), \\(u\\) goes:\n\n(two-d/sim-&gt;plotly-plot-it! spatial-arr array-u)\n\n\n\n(def sim-result (two-d/simulate {:array-u array-u\n                                 :array-v array-v} (assoc init-params :mode :burgers)))\n\n\n\nsource: notebooks/steps/step_08.clj",
+    "crumbs": [
+      "<span class='chapter-number'>10</span>  <span class='chapter-title'>Step 8: 2-D Burgers' Equation</span>"
+    ]
+  }
+]

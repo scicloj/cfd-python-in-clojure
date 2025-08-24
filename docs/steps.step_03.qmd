@@ -1,0 +1,86 @@
+---
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    theme: [cosmo, notebooks/custom.scss]
+    output-file: steps.step_03.html
+code-block-background: true
+
+---
+<style></style><style>.printedClojure .sourceCode {
+  background-color: transparent;
+  border-style: none;
+}
+</style><style>.clay-limit-image-width .clay-image {max-width: 100%}
+.clay-side-by-side .sourceCode {margin: 0}
+.clay-side-by-side {margin: 1em 0}
+</style>
+<script src="steps.step_03_files/md-default0.js" type="text/javascript"></script><script src="steps.step_03_files/md-default1.js" type="text/javascript"></script><script src="steps.step_03_files/katex2.js" type="text/javascript"></script><script src="steps.step_03_files/vega3.js" type="text/javascript"></script><script src="steps.step_03_files/vega4.js" type="text/javascript"></script><script src="steps.step_03_files/vega5.js" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
+
+# 1-D Diffusion Equation
+
+The diffusion equation in 1D is:
+
+
+$$\frac{\partial u}{\partial t} = \nu \frac{\partial^2 u}{\partial x^2}$$
+
+The equation has second-order derivative, which we first learn how to implement in the code.
+$\nu$ is the value of viscosity.
+
+
+## Discretizing $\frac{\partial^2 u}{\partial x^2}$
+
+Descretizing the second-order derivative w/ the Central Difference Scheme:
+a combination of Forward Difference and Backward Difference of the first derivative.
+
+
+$$u_{i+1} = u_i + \Delta x \frac{\partial u}{\partial x}\bigg|_i + \frac{\Delta x^2}{2} \frac{\partial ^2 u}{\partial x^2}\bigg|_i + \frac{\Delta x^3}{3!} \frac{\partial ^3 u}{\partial x^3}\bigg|_i + O(\Delta x^4)$$
+
+$$u_{i-1} = u_i - \Delta x \frac{\partial u}{\partial x}\bigg|_i + \frac{\Delta x^2}{2} \frac{\partial ^2 u}{\partial x^2}\bigg|_i - \frac{\Delta x^3}{3!} \frac{\partial ^3 u}{\partial x^3}\bigg|_i + O(\Delta x^4)$$
+
+Neglecting $O(\Delta x^4)$ or higher(very small, so neglect-able..)
+
+
+$$u_{i+1} + u_{i_1} = 2u_i + \Delta x^2 \frac{\partial^2 u}{\partial x^2}\bigg|_i$$
+
+then put it together w/ the diffusion equation:
+
+
+$$\frac{u_i^{n+1} - u_i^n}{\Delta t} = \nu\frac{u_{i+1}^n + u_{i-1}^n - 2u_i^n}{\Delta x^2}$$
+
+
+then programmatic equation to solve $u$ is:
+
+
+$$u_i^{n+1} = \nu\frac{\Delta t}{\Delta x^2}(n_{i+1}^n + u_{i-1}^n - 2u_i^n) + u_i^n$$
+
+
+::: {.sourceClojure}
+```clojure
+(def init-params
+  {:mode  :diffusion
+   :nx    42
+   :nt    20
+   :nu    0.3
+   :sigma 0.2})
+```
+:::
+
+
+
+```{=html}
+<div><script>vegaEmbed(document.currentScript.parentElement, {"mark":"line","width":500,"height":300,"encoding":{"x":{"field":"x","type":"quantitative"},"y":{"field":"y","type":"quantitative"}},"data":{"values":[{"y":1.0,"x":0.0},{"y":1.0003098,"x":0.048780486},{"y":1.001174,"x":0.09756097},{"y":1.0037098,"x":0.14634146},{"y":1.010285,"x":0.19512194},{"y":1.0252141,"x":0.24390244},{"y":1.0549635,"x":0.29268292},{"y":1.1071131,"x":0.34146342},{"y":1.1876717,"x":0.3902439},{"y":1.2974721,"x":0.4390244},{"y":1.4296093,"x":0.4878049},{"y":1.5699866,"x":0.5365854},{"y":1.7013351,"x":0.58536583},{"y":1.8086154,"x":0.63414633},{"y":1.8826016,"x":0.68292683},{"y":1.9198226,"x":0.73170733},{"y":1.9198226,"x":0.7804878},{"y":1.8826016,"x":0.8292683},{"y":1.8086154,"x":0.8780488},{"y":1.7013351,"x":0.9268293},{"y":1.5699866,"x":0.9756098},{"y":1.4296093,"x":1.0243902},{"y":1.2974721,"x":1.0731708},{"y":1.1876717,"x":1.1219512},{"y":1.1071131,"x":1.1707317},{"y":1.0549635,"x":1.2195122},{"y":1.0252141,"x":1.2682927},{"y":1.010285,"x":1.3170732},{"y":1.0037102,"x":1.3658537},{"y":1.0011767,"x":1.4146341},{"y":1.0003259,"x":1.4634147},{"y":1.0000783,"x":1.5121951},{"y":1.0000162,"x":1.5609756},{"y":1.0000029,"x":1.6097561},{"y":1.0000005,"x":1.6585366},{"y":1.0,"x":1.7073171},{"y":1.0,"x":1.7560976},{"y":1.0,"x":1.804878},{"y":1.0,"x":1.8536586},{"y":1.0,"x":1.902439},{"y":1.0,"x":1.9512196},{"y":1.0,"x":2.0}]}});</script></div>
+```
+
+
+
+```{=html}
+<div style="background-color:grey;height:2px;width:100%;"></div>
+```
+
+
+
+```{=html}
+<div><pre><small><small>source: <a href="https://github.com/scicloj/cfd-python-in-clojure/blob/main/notebooks/steps/step_03.clj">notebooks/steps/step_03.clj</a></small></small></pre></div>
+```
