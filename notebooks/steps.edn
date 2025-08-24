@@ -13,4 +13,6 @@
  {:title "Step 6- 2-D Nonlinear Convection Equation"
   :src   "notebooks/steps/step_06.clj"}
  {:title "Step 7- 2-D Diffusion Equation"
-  :src   "notebooks/steps/step_07.clj"}]
+  :src   "notebooks/steps/step_07.clj"}
+ {:title "Step 8- 2-D Burgers' Equation"
+  :src   "notebooks/steps/step_08.clj"}]

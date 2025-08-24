@@ -1,5 +1,6 @@
 (ns cfd.two-d
   (:require
+   [scicloj.kindly.v4.kind :as kind]
    [tech.v3.datatype :as dt]
    [tech.v3.tensor :as dtt]
    [utils.num-clj :as num-clj]))
@@ -47,15 +48,19 @@
             (aset spatial-array-u y-idx x-idx u-val)))))
     spatial-array-u))
 
+;; --------------------------------------------------------------
+;; update equations
+;; --------------------------------------------------------------
+
 (defn- update-convection-u
   [{:keys [array-u]} {:keys [c dx dy dt nx ny]
                       :or   {c 1.0}
                       :as   params}]
   (let [un (object-array array-u)]
     (dotimes [y-idx (- ny 1)]
-      (when (pos? y-idx)
+      (when (and (pos? y-idx) (< y-idx (dec ny)))
         (dotimes [x-idx (- nx 1)]
-          (when (pos? x-idx)
+          (when (and (pos? x-idx) (< x-idx (dec nx)))
            (let [u-j-i   (aget un y-idx x-idx)
                  u-j-i-1 (aget un y-idx (dec x-idx))
                  u-j-1-i (aget un (dec y-idx) x-idx)]
@@ -82,9 +87,9 @@
   (let [un (object-array array-u)
         vn (object-array array-v)]
     (dotimes [y-idx (- ny 1)]
-      (when (pos? y-idx)
+      (when (and (pos? y-idx) (< y-idx (dec ny)))
         (dotimes [x-idx (- nx 1)]
-          (when (pos? x-idx)
+          (when (and (pos? x-idx) (< x-idx (dec nx)))
             (let [u-j-i   (aget un y-idx x-idx)
                   u-j-i-1 (aget un y-idx (dec x-idx))
                   u-j-1-i (aget un (dec y-idx) x-idx)
@@ -155,8 +160,87 @@
     (aset array-u (dec ny) (float-array nx 1))
     (dotimes [y-idx (- ny 1)]
       (aset array-u y-idx 0 (float 1))
-      (aset array-u y-idx (dec nx) (float 1))))
-  {:array-u array-u})
+      (aset array-u y-idx (dec nx) (float 1)))
+    {:array-u array-u}))
+
+(defn update-burgers-u
+  [{:keys [array-u array-v]} {:keys [nu dx dy dt nx ny]
+                              :as   params}]
+  (let [un (object-array array-u)
+        vn (object-array array-v)]
+    (dotimes [y-idx (- ny 1)]
+      (when (and (pos? y-idx) (< y-idx (dec ny)))
+        (dotimes [x-idx (- nx 1)]
+          (when (and (pos? x-idx) (< x-idx (dec nx)))
+            (let [u-j-i   (aget un y-idx x-idx)
+                  u-j-i-1 (aget un y-idx (dec x-idx))
+                  u-j-i+1 (aget un y-idx (inc x-idx))
+                  u-j-1-i (aget un (dec y-idx) x-idx)
+                  u-j+1-i (aget un (inc y-idx) x-idx)
+                  v-j-i   (aget vn y-idx x-idx)
+                  v-j-i-1 (aget vn y-idx (dec x-idx))
+                  v-j-i+1 (aget vn y-idx (inc x-idx))
+                  v-j-1-i (aget vn (dec y-idx) x-idx)
+                  v-j+1-i (aget vn (inc y-idx) x-idx)]
+              (aset array-u y-idx x-idx
+                (float (+ u-j-i
+                          (* -1
+                             (/ dt dx)
+                             u-j-i
+                             (- u-j-i u-j-i-1))
+                          (* -1
+                             (/ dt dy)
+                             v-j-i
+                             (- u-j-i u-j-1-i))
+                          (* nu
+                             (/ dt (* dx dx))
+                             (+ u-j-i+1
+                                (* -2 u-j-i)
+                                u-j-i-1))
+                          (* nu
+                             (/ dt (* dy dy))
+                             (+ u-j+1-i
+                                (* -2 u-j-i)
+                                u-j-1-i)))))
+              (aset array-v y-idx x-idx
+                (float (+ v-j-i
+                          (* -1
+                             (/ dt dx)
+                             u-j-i
+                             (- v-j-i v-j-i-1))
+                          (* -1
+                             (/ dt dy)
+                             v-j-i
+                             (- v-j-i v-j-1-i))
+                          (* nu
+                             (/ dt (* dx dx))
+                             (+ v-j-i+1
+                                (* -2 v-j-i)
+                                v-j-i-1))
+                          (* nu
+                             (/ dt (* dy dy))
+                             (+ v-j+1-i
+                                (* -2 v-j-i)
+                                v-j-1-i))))))))))
+    ;; boundary condition for u
+    (aset array-u 0 (float-array nx 1))
+    (aset array-u (dec ny) (float-array nx 1))
+    (dotimes [y-idx (- ny 1)]
+      (aset array-u y-idx 0 (float 1))
+      (aset array-u y-idx (dec nx) (float 1)))
+
+    ;; boundary condition for v
+    (aset array-v 0 (float-array nx 1))
+    (aset array-v (dec ny) (float-array nx 1))
+    (dotimes [y-idx (- ny 1)]
+      (aset array-v y-idx 0 (float 1))
+      (aset array-v y-idx (dec nx) (float 1))))
+  {:array-u array-u
+   :array-v array-v})
+
+;; --------------------------------------------------------------
+;; simulation loop
+;; --------------------------------------------------------------
 
 (defn simulate
   "Runs the simulation for nt time steps.
@@ -168,13 +252,42 @@
   Returns the final u array after nt updates"
   [{:keys [array-u array-v] :as vel-arr-vec}
    {:keys [nt mode]
-    :or   {mode :convection}
+    :or   {nt   0
+           mode :convection}
     :as   params}]
   (let [update-fn (case mode
                     :nonlinear-convection update-nonlinear-convection-u
                     :diffusion update-diffusion-u
+                    :burgers update-burgers-u
+                    ;; default (linear convection)
                     update-convection-u)]
     (loop [n 0]
       (if (= n nt)
         vel-arr-vec
         (do (update-fn vel-arr-vec params) (recur (inc n)))))))
+
+;; --------------------------------------------------------------
+;; plotly plotting helper (for 3d plotting)
+;; --------------------------------------------------------------
+
+(def plotly-opts
+  {:type    :mesh3d
+   :opacity 0.20
+   :color   "size"
+   :marker  {:colorscale :Viridis}})
+
+(defn arr->plotly-plottable-data
+  [[array-x array-y] vel-arr]
+  {:x (apply concat (repeat (alength array-y) array-x))
+   :y (apply concat (map #(repeat (alength array-x) %) array-y))
+   :z (apply concat vel-arr)})
+
+(defn sim->plotly-plot-it!
+  ([spatial-arr vel-arr]
+   (sim->plotly-plot-it! spatial-arr vel-arr nil))
+  ([spatial-arr vel-arr update-fn]
+   (let [plottable-data (arr->plotly-plottable-data spatial-arr vel-arr)]
+     (kind/plotly
+       (cond-> {:data   [(merge plottable-data plotly-opts)]
+                :layout {:scene {:zaxis {:range [0.8 2.2]}}}}
+         (fn? update-fn) (update-fn))))))

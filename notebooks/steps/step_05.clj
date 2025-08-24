@@ -90,41 +90,23 @@
 ;; The plotting data formats goes like:
 
 ^:kindly/hide-code
-(defn arr->plotly-plottable-data
-  [array-u [array-x array-y]]
-  {:x (apply concat (repeat (alength array-y) array-x))
-   :y (apply concat (map #(repeat (alength array-x) %) array-y))
-   :z (apply concat array-u)})
-
-^:kindly/hide-code
-(def plotly-plottable-data (arr->plotly-plottable-data array-u spatial-arr))
+(def plotly-plottable-data (two-d/arr->plotly-plottable-data spatial-arr array-u))
 
 ^:kindly/hide-code
 (-> plotly-plottable-data
     tc/dataset
     (kind/dataset {:dataset/print-range 6}))
-
 ;;
 ;; initial plotting goes:
 ;;
 ^:kindly/hide-code
-(def plotly-opts {:type    :mesh3d
-                  :opacity 0.20
-                  :color   "lightpink"
-                  :marker  {:colorscale :Viridis}})
-^:kindly/hide-code
-(kind/plotly
-  {:data [(merge plotly-plottable-data plotly-opts)]})
-
+(two-d/sim->plotly-plot-it! spatial-arr array-u)
 ;;
 ;; **note**: for now, we skip 3d plotting notes from PythonCFD(further **_TODO_**)
 ;;
-
+;;
 ;; ### Iterating in 2-D w/ linear convection equation
 ;;
-;;
 ^:kindly/hide-code
-(let [{:keys [array-u]} (two-d/simulate {:array-u array-u} init-params)
-      plottable-data (arr->plotly-plottable-data array-u spatial-arr)]
-  (kind/plotly
-    {:data [(merge plottable-data plotly-opts)]}))
+(let [{:keys [array-u]} (two-d/simulate {:array-u array-u} init-params)]
+  (two-d/sim->plotly-plot-it! spatial-arr array-u))

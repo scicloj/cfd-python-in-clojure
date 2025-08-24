@@ -38,6 +38,7 @@
   {:nx    nx
    :ny    ny
    :nu    nu
+   :nt    nt
    :sigma sigma
    :dx    dx
    :dy    dy
@@ -56,52 +57,24 @@
 ;;
 (def array-u (two-d/create-init-u init-params spatial-arr))
 ;;
-^:kindly/hide-code
-(defn arr->plotly-plottable-data
-  [array-u [array-x array-y]]
-  {:x (apply concat (repeat (alength array-y) array-x))
-   :y (apply concat (map #(repeat (alength array-x) %) array-y))
-   :z (apply concat array-u)})
-
-^:kindly/hide-code
-(def plotly-plottable-data (arr->plotly-plottable-data array-u spatial-arr))
-
-^:kindly/hide-code
-(-> plotly-plottable-data
-    tc/dataset
-    (kind/dataset {:dataset/print-range 6}))
-;;
 ;; initial plotting goes:
 ;;
 ^:kindly/hide-code
-(def plotly-opts {:type    :mesh3d
-                  :opacity 0.20
-                  :color   "lightpink"
-                  :marker  {:colorscale :Viridis}})
-^:kindly/hide-code
-(kind/plotly
-  {:data   [(merge plotly-plottable-data plotly-opts)]
-   :layout {:scene {:zaxis {:range [0.8 2.2]}}}})
-
+(two-d/sim->plotly-plot-it! spatial-arr array-u)
+;;
 ;; ### Iterating in 2-D w/ diffusion equation
 ;;
-^:kindly/hide-code
-(defn plot-it! [arr-u nt]
-  (let [{:keys [array-u]} (two-d/simulate {:array-u arr-u} (assoc init-params
-                                                             :nt nt
-                                                             :mode :diffusion))
-        plottable-data (arr->plotly-plottable-data array-u spatial-arr)]
-    (kind/plotly
-      {:data  [(merge plottable-data plotly-opts)]
-       :layout {:scene {:zaxis {:range [0.8 2.2]}}}})))
-
-;; nt=10
-^:kindly/hide-code (plot-it! array-u 10)
-^:kindly/hide-code (def array-u (object-array array-u))
-
-;; nt=14
-^:kindly/hide-code (plot-it! array-u 4)
-^:kindly/hide-code (def array-u (object-array array-u))
-
-;; nt=50
-^:kindly/hide-code (plot-it! array-u 36)
+^:kindly/hide-code (def param-with-mode (assoc init-params :mode :diffusion))
+^:kindly/hide-code (def sim-result-1 (two-d/simulate {:array-u array-u} param-with-mode))
+;;
+;; at $nt=10$
+^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-1))
+;;
+;; at $nt=14$
+^:kindly/hide-code (def sim-result-2 (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 4)))
+^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-2))
+;;
+;; at $nt=50$
+^:kindly/hide-code (def sim-result-3 (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 36)))
+^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-3))
+;;

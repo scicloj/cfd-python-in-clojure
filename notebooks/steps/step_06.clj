@@ -71,14 +71,7 @@
 (def array-v (two-d/create-init-u init-params spatial-arr))
 ;;
 ^:kindly/hide-code
-(defn arr->plotly-plottable-data
-  [vel-array [array-x array-y]]
-  {:x (apply concat (repeat (alength array-y) array-x))
-   :y (apply concat (map #(repeat (alength array-x) %) array-y))
-   :z (apply concat vel-array)})
-;;
-^:kindly/hide-code
-(def plotly-plottable-data (arr->plotly-plottable-data array-u spatial-arr))
+(def plotly-plottable-data (two-d/arr->plotly-plottable-data spatial-arr array-u))
 ;;
 ^:kindly/hide-code
 (-> plotly-plottable-data
@@ -88,14 +81,8 @@
 ;; initial plotting w/ $x$, $y$, $u$ goes:
 ;;
 ^:kindly/hide-code
-(def plotly-opts {:type    :mesh3d
-                  :opacity 0.20
-                  :color   "blue"
-                  :marker  {:colorscale :Viridis}})
+(two-d/sim->plotly-plot-it! spatial-arr array-u)
 ;;
-^:kindly/hide-code
-(kind/plotly {:data [(merge plotly-plottable-data plotly-opts)]})
-
 ;; ### Iterating in 2-D w/ nonlinear convection equation
 ;;
 ^:kindly/hide-code
@@ -103,15 +90,8 @@
                         {:array-u array-u
                          :array-v array-v}
                         (assoc init-params :mode :nonlinear-convection)))
-
-
 ;; u
-(let [plottable-data (arr->plotly-plottable-data (:array-u simulated-result) spatial-arr)]
-  (kind/plotly
-    {:data [(merge plottable-data plotly-opts)]}))
+(two-d/sim->plotly-plot-it! spatial-arr (:array-u simulated-result))
 ;; v
-(let [plottable-data (arr->plotly-plottable-data (:array-v simulated-result) spatial-arr)]
-  (kind/plotly
-    {:data [(merge plottable-data (assoc plotly-opts :color "red"))]}))
-;;
+(two-d/sim->plotly-plot-it! spatial-arr (:array-v simulated-result))
 ;;
