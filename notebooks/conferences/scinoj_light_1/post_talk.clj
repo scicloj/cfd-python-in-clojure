@@ -51,7 +51,7 @@
 ^:kindly/hide-code (def linear-convection-arr-u (float-array init-bump-u))
 
 ^:kindly/hide-code
-(def linear-convection-u (one-d/simulate-cumulate linear-convection-arr-u linear-convection-param))
+(def linear-convection-u (one-d/simulate-accumulate linear-convection-arr-u linear-convection-param))
 
 ^:kindly/hide-code
 (vega-lite-plot {:plot-map (ts-vega-lite-plot-map [-0.1 2.1] (assoc linear-convection-param
@@ -66,7 +66,7 @@
 ^:kindly/hide-code (def convection-arr-u (float-array init-bump-u))
 
 ^:kindly/hide-code
-(def non-linear-convection-u (one-d/simulate-cumulate convection-arr-u nonlinear-convection-param))
+(def non-linear-convection-u (one-d/simulate-accumulate convection-arr-u nonlinear-convection-param))
 
 ^:kindly/hide-code
 (vega-lite-plot {:plot-map (ts-vega-lite-plot-map [-0.1 2.1] (assoc nonlinear-convection-param
@@ -81,7 +81,7 @@
 ^:kindly/hide-code (def diffusion-arr-u (float-array init-bump-u))
 
 ^:kindly/hide-code
-(def diffusion-u (one-d/simulate-cumulate diffusion-arr-u diffusion-param))
+(def diffusion-u (one-d/simulate-accumulate diffusion-arr-u diffusion-param))
 
 ^:kindly/hide-code
 (vega-lite-plot {:plot-map (ts-vega-lite-plot-map [-0.1 2.1] (assoc diffusion-param
@@ -97,7 +97,7 @@
 ^:kindly/hide-code (def burger-arr-u (float-array init-bump-u))
 
 ^:kindly/hide-code
-(def burgers-u (one-d/simulate-cumulate burger-arr-u burgers-param))
+(def burgers-u (one-d/simulate-accumulate burger-arr-u burgers-param))
 
 ^:kindly/hide-code
 (vega-lite-plot {:plot-map (ts-vega-lite-plot-map [-0.1 2.1] (assoc burgers-param

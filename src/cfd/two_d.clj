@@ -33,19 +33,19 @@
 
 (defn create-init-u
   "Create u(flow velocity) for x, y grid"
-  [{:keys [nx ny condition-fn]
-    :or   {condition-fn default-condition-fn}}
+  [{:keys [nx ny condition-fn d-type]
+    :or   {condition-fn default-condition-fn
+           d-type       Float/TYPE}}
    [array-x array-y]]
   (let [array-x-len     (or nx (alength array-x))
         array-y-len     (or ny (alength array-y))
-        spatial-array-u (make-array Float/TYPE array-x-len array-y-len)]
-    (dotimes [y-idx (- (alength spatial-array-u) 1)]
-      (let [row-array (aget spatial-array-u y-idx)]
-        (dotimes [x-idx (- (alength row-array) 1)]
-          (let [x-val (aget array-x x-idx)
-                y-val (aget array-y y-idx)
-                u-val (condition-fn x-val y-val)]
-            (aset spatial-array-u y-idx x-idx u-val)))))
+        spatial-array-u (make-array d-type array-x-len array-y-len)]
+    (dotimes [y-idx array-y-len]
+      (dotimes [x-idx array-x-len]
+        (let [x-val (aget array-x x-idx)
+              y-val (aget array-y y-idx)
+              u-val (condition-fn x-val y-val)]
+          (aset spatial-array-u y-idx x-idx u-val))))
     spatial-array-u))
 
 ;; --------------------------------------------------------------
@@ -73,7 +73,7 @@
                             (/ dt dy)
                             (- u-j-i u-j-1-i))))))))))
 
-   ;; boundary condition
+   ;; boundary conditions
    (aset array-u 0 (float-array nx 1))
    (aset array-u (dec ny) (float-array nx 1))
    (dotimes [y-idx (- ny 1)]

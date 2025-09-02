@@ -155,8 +155,8 @@
        array-u
        (do (update-fn array-u params) (recur (inc n)))))))
 
-(defn simulate-cumulate
-  "Runs the simulation for nt time steps and cumulate those results.
+(defn simulate-accumulate
+  "Runs the simulation for nt time steps and accumulate those results.
 
   Parameters:
   - array-u: the initial u array

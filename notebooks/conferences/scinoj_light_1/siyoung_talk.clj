@@ -111,7 +111,7 @@
 ;; <div style="display: flex;">
 ^:kindly/hide-code (def init-step-u (one-d/create-array-u {:array-x      array-x
                                                            :condition-fn #(if (< % 2.0) 1 0)}))
-^:kindly/hide-code (def cumulated-step-u (one-d/simulate-cumulate init-step-u init-params))
+^:kindly/hide-code (def cumulated-step-u (one-d/simulate-accumulate init-step-u init-params))
 ^:kindly/hide-code (def cum-plot-params (assoc init-params :cum-array-y cumulated-step-u))
 ^:kindly/hide-code (cumulated-line-plot cum-plot-params)
 ^:kindly/hide-code (vega-lite-plot {:plot-map (ts-vega-lite-plot-map [-0.1 1.1] cum-plot-params)})
