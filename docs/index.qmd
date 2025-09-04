@@ -45,15 +45,17 @@ with states of its density, pressure and temperature.
 
 * [Step 3 - 1-D Diffusion Equation](steps.step_03.html)
 
-* [Step 4- 1-D Burgers' Equation](steps.step_04.html)
+* [Step 4 - 1-D Burgers' Equation](steps.step_04.html)
 
-* [Step 5- 2-D Linear Convection Equation](steps.step_05.html)
+* [Step 5 - 2-D Linear Convection Equation](steps.step_05.html)
 
-* [Step 6- 2-D Nonlinear Convection Equation](steps.step_06.html)
+* [Step 6 - 2-D Nonlinear Convection Equation](steps.step_06.html)
 
-* [Step 7- 2-D Diffusion Equation](steps.step_07.html)
+* [Step 7 - 2-D Diffusion Equation](steps.step_07.html)
 
-* [Step 8- 2-D Burgers' Equation](steps.step_08.html)
+* [Step 8 - 2-D Burgers' Equation](steps.step_08.html)
+
+* [Step 9 - Laplace Equation](steps.step_09.html)
 
 
 ```{=html}

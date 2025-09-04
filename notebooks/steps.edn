@@ -6,13 +6,15 @@
   :src   "notebooks/steps/cfl_condition.clj"}
  {:title "Step 3 - 1-D Diffusion Equation"
   :src   "notebooks/steps/step_03.clj"}
- {:title "Step 4- 1-D Burgers' Equation"
+ {:title "Step 4 - 1-D Burgers' Equation"
   :src   "notebooks/steps/step_04.clj"}
- {:title "Step 5- 2-D Linear Convection Equation"
+ {:title "Step 5 - 2-D Linear Convection Equation"
   :src   "notebooks/steps/step_05.clj"}
- {:title "Step 6- 2-D Nonlinear Convection Equation"
+ {:title "Step 6 - 2-D Nonlinear Convection Equation"
   :src   "notebooks/steps/step_06.clj"}
- {:title "Step 7- 2-D Diffusion Equation"
+ {:title "Step 7 - 2-D Diffusion Equation"
   :src   "notebooks/steps/step_07.clj"}
- {:title "Step 8- 2-D Burgers' Equation"
-  :src   "notebooks/steps/step_08.clj"}]
+ {:title "Step 8 - 2-D Burgers' Equation"
+  :src   "notebooks/steps/step_08.clj"}
+ {:title "Step 9 - Laplace Equation"
+  :src   "notebooks/steps/step_09.clj"}]

@@ -67,8 +67,9 @@
                  :condition-fn (fn [x-val y-val]
                                  (if (= x-val ((comp last first) spatial-array))
                                    (double y-val)
-                                   (double 0))))
+                                   0.0)))
                spatial-array))
+
 ;;
 ;; ### Define the Laplace function
 ;;
@@ -77,8 +78,8 @@
 ;;
 
 ^:kindly/hide-code
-(defn l1-norm [p pn]
-  (let [p-flat      (mapcat identity p)
+(defn l1-norm [{:keys [nx ny array-p]} pn]
+  (let [p-flat      (mapcat identity array-p)
         pn-flat     (mapcat identity pn)
         numerator   (reduce + (map #(fm/abs (- (fm/abs ^Double %1) (Math/abs ^Double %2))) p-flat pn-flat))
         denominator (reduce + (map #(fm/abs %) pn-flat))]
@@ -89,79 +90,71 @@
 
 (defn laplace-2d [{:keys [spatial-array array-p nx ny dx dy l1norm-target]
                    :as   params}]
-  (let [[_array-x array-y] spatial-array]
-    (loop [l1-norm-val 1]
-      (if (< l1-norm-val l1norm-target)
-        array-p
-        (let [pn (aclone array-p)]
-          (dotimes [y-idx ny]
-            (when (and (pos? y-idx) (< y-idx (dec ny)))
-              (dotimes [x-idx nx]
-                (when (and (pos? x-idx) (< x-idx (dec nx)))
-                  (let [p-j-i+1 (aget pn y-idx (inc x-idx))
-                        p-j-i-1 (aget pn y-idx (dec x-idx))
-                        p-j+1-i (aget pn (inc y-idx) x-idx)
-                        p-j-1-i (aget pn (dec y-idx) x-idx)
-                        dx-2    (pow dx 2)
-                        dy-2    (pow dy 2)]
-                    (aset array-p y-idx x-idx
-                      (double (/ (+ (* dy-2 (+ p-j-i+1 p-j-i-1))
-                                    (* dx-2 (+ p-j+1-i p-j-1-i)))
-                                 (* 2 (+ dx-2 dy-2))))))))))
+  (let [[_array-x array-y] spatial-array
+        !l1-norm  (atom 1.0)]
+    (while (> @!l1-norm l1norm-target)
+      (let [pn (aclone array-p)]
+        (dotimes [y-idx (dec ny)]
+          (when (pos? y-idx)
+            (dotimes [x-idx (dec nx)]
+              (when (pos? x-idx)
+                (let [p-j-i+1 (aget pn y-idx (inc x-idx))
+                      p-j-i-1 (aget pn y-idx (dec x-idx))
+                      p-j+1-i (aget pn (inc y-idx) x-idx)
+                      p-j-1-i (aget pn (dec y-idx) x-idx)
+                      dx-2    (pow dx 2)
+                      dy-2    (pow dy 2)]
+                  (aset array-p y-idx x-idx
+                    (double (/ (+ (* dy-2 (+ p-j-i+1 p-j-i-1))
+                                  (* dx-2 (+ p-j+1-i p-j-1-i)))
+                               (* 2 (+ dx-2 dy-2))))))))))
 
-          ;; boundary conditions
-          ; p = 0 @ x = 0
-          (dotimes [y-idx ny]
-            (aset array-p y-idx 0 (double 0)))
-          ;; p = y @ x = 2
-          (dotimes [y-idx ny]
-            (aset array-p y-idx (dec nx) (double (aget array-y y-idx))))
-          ;; dp/dy = 0 @ y = 0
-          (dotimes [x-idx nx]
-            (aset array-p 0 x-idx (aget array-p 1 x-idx)))
-          ;; dp/dy = 0 @ y = 1
-          (dotimes [x-idx nx]
-            (aset array-p (dec ny) x-idx (aget array-p (- ny 2) x-idx)))
-          ;; calculate l1nom
-          (reset! !test [array-p pn (l1-norm array-p pn)])
-          (recur (l1-norm array-p pn)))))))
+        ;; boundary conditions
+        ;; p = 0 @ x = 0
+        (dotimes [y-idx ny]
+          (aset array-p y-idx 0 0.0))
+        ;; p = y @ x = 2
+        (dotimes [y-idx ny]
+          (aset array-p y-idx (dec nx) (double (aget array-y y-idx))))
+        ;; dp/dy = 0 @ y = 0
+        (dotimes [x-idx nx]
+          (aset array-p 0 x-idx (aget array-p 1 x-idx)))
+        ;; dp/dy = 0 @ y = 1
+        (dotimes [x-idx nx]
+          (aset array-p (dec ny) x-idx (aget array-p (- ny 2) x-idx)))
+        ;; calculate l1nom
+        (reset! !test [array-p pn (l1-norm params pn)])
+        (reset! !l1-norm (l1-norm params pn))))
+    array-p))
 
 ;; Now let's try looking at our initial condition plot.
 ;;
+
+(def plotly-surface-plot-base-opts
+  (let [[array-x array-y] spatial-array]
+    {:layout {:scene {:xaxis {:range [0.0 2.1]}
+                      :yaxis {:range [0.0 1.1]}
+                      :zaxis {:range [0.0 1.1]}}}
+     :data   [{:x       array-x
+               :y       array-y
+               :z       array-p
+               :type    :surface
+               :opacity 0.20
+               :color   "size"
+               :marker  {:colorscale :Viridis}}]}))
+
 ^:kindly/hide-code
-(let [plottable-data (two-d/arr->plotly-plottable-data spatial-array array-p)]
-  (kind/plotly
-    {:data   [(merge plottable-data (assoc two-d/plotly-opts :type :scatter3d))]
-     :layout {:scene {:zaxis {:range [0.0 1.0]}}}}))
+(kind/plotly plotly-surface-plot-base-opts)
 ;;
-;; We will have init params:
+;; We will have init params for our simulation:
 (def init-params
-  (merge spatial-init-param
-         {:spatial-array spatial-array
-          :array-p       array-p
-          :l1norm-target 1e-4}))
+  (assoc spatial-init-param
+         :spatial-array spatial-array
+         :array-p array-p
+         :l1norm-target 1e-4))
 
 ;;
 ;; Then run the simulation:
-
-(let [simulated-data (laplace-2d init-params)
-      [array-x array-y] spatial-array]
+(let [simulated-data (laplace-2d init-params)]
   (kind/plotly
-    {:colorscale :Viridis
-     :data   [(merge {:x array-x
-                      :y array-y
-                      :z simulated-data} (assoc two-d/plotly-opts :type :surface))]
-     :layout {:scene {:xaxis {:range [0.0 2.0]}
-                      :yaxis {:range [0.0 1.0]}
-                      :zaxis {:range [0.0 1.0]}}}}))
-
-;; testing with surface plot
-
-(let [simulated-data (laplace-2d init-params)
-      plottable-data (two-d/arr->plotly-plottable-data spatial-array simulated-data)]
-  (kind/plotly
-    {:colorscale :Viridis
-     :data   [(merge plottable-data two-d/plotly-opts)]
-     :layout {:scene {:xaxis {:range [0.0 2.0]}
-                      :yaxis {:range [0.0 1.0]}
-                      :zaxis {:range [0.0 1.0]}}}}))
+    (update-in plotly-surface-plot-base-opts [:data 0] #(assoc % :z simulated-data))))

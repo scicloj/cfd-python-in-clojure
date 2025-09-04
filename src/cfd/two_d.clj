@@ -57,10 +57,10 @@
                       :or   {c 1.0}
                       :as   params}]
   (let [un (object-array array-u)]
-    (dotimes [y-idx (- ny 1)]
-      (when (and (pos? y-idx) (< y-idx (dec ny)))
-        (dotimes [x-idx (- nx 1)]
-          (when (and (pos? x-idx) (< x-idx (dec nx)))
+    (dotimes [y-idx (dec ny)]
+      (when (pos? y-idx)
+        (dotimes [x-idx (dec nx)]
+          (when (pos? x-idx)
            (let [u-j-i   (aget un y-idx x-idx)
                  u-j-i-1 (aget un y-idx (dec x-idx))
                  u-j-1-i (aget un (dec y-idx) x-idx)]
@@ -86,10 +86,10 @@
                               :as   params}]
   (let [un (object-array array-u)
         vn (object-array array-v)]
-    (dotimes [y-idx (- ny 1)]
-      (when (and (pos? y-idx) (< y-idx (dec ny)))
-        (dotimes [x-idx (- nx 1)]
-          (when (and (pos? x-idx) (< x-idx (dec nx)))
+    (dotimes [y-idx (dec ny)]
+      (when (pos? y-idx)
+        (dotimes [x-idx (dec nx)]
+          (when (pos? x-idx)
             (let [u-j-i   (aget un y-idx x-idx)
                   u-j-i-1 (aget un y-idx (dec x-idx))
                   u-j-1-i (aget un (dec y-idx) x-idx)
@@ -133,10 +133,10 @@
   [{:keys [array-u]} {:keys [nu dx dy dt nx ny]
                       :as   params}]
   (let [un (object-array array-u)]
-    (dotimes [y-idx (- ny 1)]
-      (when (and (pos? y-idx) (< y-idx (dec ny)))
-        (dotimes [x-idx (- nx 1)]
-          (when (and (pos? x-idx) (< x-idx (dec nx)))
+    (dotimes [y-idx (dec ny)]
+      (when (pos? y-idx)
+        (dotimes [x-idx (dec nx)]
+          (when (pos? x-idx)
             (let [u-j-i       (aget un y-idx x-idx)
                   u-j-i-1     (aget un y-idx (dec x-idx))
                   u-j-i+1     (aget un y-idx (inc x-idx))
@@ -168,10 +168,10 @@
                               :as   params}]
   (let [un (object-array array-u)
         vn (object-array array-v)]
-    (dotimes [y-idx (- ny 1)]
-      (when (and (pos? y-idx) (< y-idx (dec ny)))
-        (dotimes [x-idx (- nx 1)]
-          (when (and (pos? x-idx) (< x-idx (dec nx)))
+    (dotimes [y-idx (dec ny)]
+      (when (pos? y-idx)
+        (dotimes [x-idx (dec nx)]
+          (when (pos? x-idx)
             (let [u-j-i   (aget un y-idx x-idx)
                   u-j-i-1 (aget un y-idx (dec x-idx))
                   u-j-i+1 (aget un y-idx (inc x-idx))
