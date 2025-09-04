@@ -55,8 +55,8 @@
 (def nx 31)
 (def ny 31)
 (def spatial-init-param
-  {:nx nx :x-start 0 :x-end 2 :dx (double (/ 2 (- nx -1)))
-   :ny ny :y-start 0 :y-end 1 :dy (double (/ 2 (- ny -1)))})
+  {:nx nx :x-start 0 :x-end 2 :dx (double (/ 2 (dec nx)))
+   :ny ny :y-start 0 :y-end 1 :dy (double (/ 1 (dec ny)))})
 ;;
 ;; Have the discretized 2D spatial array ready:
 (def spatial-array (two-d/create-array-2d spatial-init-param))
