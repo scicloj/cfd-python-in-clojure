@@ -57,6 +57,8 @@ with states of its density, pressure and temperature.
 
 * [Step 9 - Laplace Equation](steps.step_09.html)
 
+* [Step 10 - Poisson Equation](steps.step_10.html)
+
 
 ```{=html}
 <div style="background-color:grey;height:2px;width:100%;"></div>
