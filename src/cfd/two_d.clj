@@ -48,6 +48,10 @@
           (aset spatial-array-u y-idx x-idx u-val))))
     spatial-array-u))
 
+(defn create-init-zeros-u
+  [params spatial-array]
+  (create-init-u (assoc params :condition-fn (constantly 0.0)) spatial-array))
+
 (defn clone-2d-array [array-2d]
   (to-array-2d (map #(double-array %) array-2d)))
 
