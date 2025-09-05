@@ -48,6 +48,9 @@
           (aset spatial-array-u y-idx x-idx u-val))))
     spatial-array-u))
 
+(defn clone-2d-array [array-2d]
+  (to-array-2d (map #(double-array %) array-2d)))
+
 ;; --------------------------------------------------------------
 ;; update equations
 ;; --------------------------------------------------------------
@@ -56,7 +59,7 @@
   [{:keys [array-u]} {:keys [c dx dy dt nx ny]
                       :or   {c 1.0}
                       :as   params}]
-  (let [un (object-array array-u)]
+  (let [un (clone-2d-array array-u)]
     (dotimes [y-idx (dec ny)]
       (when (pos? y-idx)
         (dotimes [x-idx (dec nx)]
@@ -84,8 +87,8 @@
 (defn- update-nonlinear-convection-u
   [{:keys [array-u array-v]} {:keys [dx dy dt nx ny]
                               :as   params}]
-  (let [un (object-array array-u)
-        vn (object-array array-v)]
+  (let [un (clone-2d-array array-u)
+        vn (clone-2d-array array-v)]
     (dotimes [y-idx (dec ny)]
       (when (pos? y-idx)
         (dotimes [x-idx (dec nx)]
@@ -132,7 +135,7 @@
 (defn- update-diffusion-u
   [{:keys [array-u]} {:keys [nu dx dy dt nx ny]
                       :as   params}]
-  (let [un (object-array array-u)]
+  (let [un (clone-2d-array array-u)]
     (dotimes [y-idx (dec ny)]
       (when (pos? y-idx)
         (dotimes [x-idx (dec nx)]
@@ -166,8 +169,8 @@
 (defn update-burgers-u
   [{:keys [array-u array-v]} {:keys [nu dx dy dt nx ny]
                               :as   params}]
-  (let [un (object-array array-u)
-        vn (object-array array-v)]
+  (let [un (clone-2d-array array-u)
+        vn (clone-2d-array array-v)]
     (dotimes [y-idx (dec ny)]
       (when (pos? y-idx)
         (dotimes [x-idx (dec nx)]

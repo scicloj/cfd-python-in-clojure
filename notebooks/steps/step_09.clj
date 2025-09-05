@@ -81,19 +81,16 @@
 (defn l1-norm [{:keys [nx ny array-p]} pn]
   (let [p-flat      (mapcat identity array-p)
         pn-flat     (mapcat identity pn)
-        numerator   (reduce + (map #(fm/abs (- (fm/abs ^Double %1) (Math/abs ^Double %2))) p-flat pn-flat))
+        numerator   (reduce + (map #(fm/abs (- (fm/abs ^Double %1) (fm/abs ^Double %2))) p-flat pn-flat))
         denominator (reduce + (map #(fm/abs %) pn-flat))]
     (/ numerator denominator)))
-
-(def !test (atom []))
-(= (mapcat identity (mapcat identity (first @!test))) (mapcat identity (second @!test)))
 
 (defn laplace-2d [{:keys [spatial-array array-p nx ny dx dy l1norm-target]
                    :as   params}]
   (let [[_array-x array-y] spatial-array
-        !l1-norm  (atom 1.0)]
+        !l1-norm (atom 1.0)]
     (while (> @!l1-norm l1norm-target)
-      (let [pn (aclone array-p)]
+      (let [pn (two-d/clone-2d-array array-p)]
         (dotimes [y-idx (dec ny)]
           (when (pos? y-idx)
             (dotimes [x-idx (dec nx)]
@@ -108,7 +105,6 @@
                     (double (/ (+ (* dy-2 (+ p-j-i+1 p-j-i-1))
                                   (* dx-2 (+ p-j+1-i p-j-1-i)))
                                (* 2 (+ dx-2 dy-2))))))))))
-
         ;; boundary conditions
         ;; p = 0 @ x = 0
         (dotimes [y-idx ny]
@@ -123,7 +119,6 @@
         (dotimes [x-idx nx]
           (aset array-p (dec ny) x-idx (aget array-p (- ny 2) x-idx)))
         ;; calculate l1nom
-        (reset! !test [array-p pn (l1-norm params pn)])
         (reset! !l1-norm (l1-norm params pn))))
     array-p))
 
@@ -152,7 +147,6 @@
          :spatial-array spatial-array
          :array-p array-p
          :l1norm-target 1e-4))
-
 ;;
 ;; Then run the simulation:
 (let [simulated-data (laplace-2d init-params)]

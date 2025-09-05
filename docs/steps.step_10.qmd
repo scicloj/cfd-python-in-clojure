@@ -17,37 +17,6 @@ code-block-background: true
 .clay-side-by-side {margin: 1em 0}
 </style>
 <script src="steps.step_10_files/md-default0.js" type="text/javascript"></script><script src="steps.step_10_files/md-default1.js" type="text/javascript"></script><script src="steps.step_10_files/katex2.js" type="text/javascript"></script><script src="steps.step_10_files/plotly3.js" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
-
-::: {.sourceClojure}
-```clojure
-:kindly/hide-code
-```
-:::
-
-
-
-::: {.printedClojure}
-```clojure
-:kindly/hide-code
-
-```
-:::
-
-
-
-::: {.sourceClojure}
-```clojure
-(ns steps.step-10
-  (:require
-   [cfd.two-d :as two-d]
-   [fastmath.core :as fm :refer [pow]]
-   [scicloj.kindly.v4.api :as kindly]
-   [scicloj.kindly.v4.kind :as kind]
-   [utils.notebook :refer [md tex]]))
-```
-:::
-
-
 For a moment, recall the Navier-Stokes equations for an incompressible fluid,
 where $\vec{v}$ represents the velocity field:
 
@@ -234,7 +203,7 @@ Laplace's equation?
     (dotimes [x-idx (- nx 2)]
       (let [y-idx   (inc y-idx)
             x-idx   (inc x-idx)
-            pd      (aclone array-p)
+            pd      (two-d/clone-2d-array array-p)
             p-j-i+1 (aget pd y-idx (inc x-idx))
             p-j-i-1 (aget pd y-idx (dec x-idx))
             p-j+1-i (aget pd (inc y-idx) x-idx)

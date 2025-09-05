@@ -1,4 +1,4 @@
-:kindly/hide-code
+^:kindly/hide-code
 (ns steps.step-10
   (:require
    [cfd.two-d :as two-d]
@@ -91,7 +91,7 @@
     (dotimes [x-idx (- nx 2)]
       (let [y-idx   (inc y-idx)
             x-idx   (inc x-idx)
-            pd      (aclone array-p)
+            pd      (two-d/clone-2d-array array-p)
             p-j-i+1 (aget pd y-idx (inc x-idx))
             p-j-i-1 (aget pd y-idx (dec x-idx))
             p-j+1-i (aget pd (inc y-idx) x-idx)
