@@ -10,7 +10,7 @@
 ;; The final two steps in this interactive module porting CFD Python into Clojure will both solve
 ;; both the Navier-Stokes equations in two dimensions, but with different boundary conditions.
 ;;
-;; The momentum equation in vector form for a velocity field $\vec{v}$is:
+;; The momentum equation in vector form for a velocity field $\vec{v}$ is:
 (tex "\\frac{\\partial \\vec{v}}{\\partial t}+(\\vec{v}\\cdot\\nabla)\\vec{v}=-\\frac{1}{\\rho}\\nabla p + \\nu \\nabla^2\\vec{v}")
 ;;
 ;; This represents three scalar equations, one for each velocity component $(u, v, w)$. But we will
@@ -76,9 +76,11 @@
 (def x-end 2)
 (def y-start 0)
 (def y-end 2)
+(def dx (double (/ (- x-end x-start) (dec nx))))
+(def dy (double (/ (- y-end y-start) (dec ny))))
 (def spatial-init-params
-  {:nx nx :x-start x-start :x-end x-end :dx (double (/ (- x-end x-start) (dec nx)))
-   :ny ny :y-start y-start :y-end y-end :dy (double (/ (- y-end y-start) (dec ny)))})
+  {:nx nx :x-start x-start :x-end x-end :dx dx :x-end-idx (dec nx) :x-second-end-idx (- nx 2)
+   :ny ny :y-start y-start :y-end y-end :dy dy :y-end-idx (dec ny) :y-second-end-idx (- ny 2)})
 
 (def spatial-array (two-d/create-array-2d spatial-init-params))
 ;;
@@ -87,96 +89,154 @@
 (def nu 0.1)
 (def dt 0.001)
 
+;; Doing some pre-calculation to optimize the performance
+(def pre-calculation-params
+  {:two-dx                (* 2.0 dx)
+   :two-dy                (* 2.0 dy)
+   :two-dx-dy             (* 2.0 dx dy)
+   :dx-square             (pow dx 2)
+   :dy-square             (pow dy 2)
+   :four-dx-square        (* 4.0 (pow dx 2))
+   :four-dy-square        (* 4.0 (pow dy 2))
+   :dx-dy-squares         (* (pow dx 2) (pow dy 2))
+   :dx-dy                 (* dx dy)
+   :over-dx               (/ 1.0 dx)
+   :over-dy               (/ 1.0 dy)
+   :dt-over-dx            (/ dt dx)
+   :dt-over-dy            (/ dt dy)
+   :dt-over-dx-square     (/ dt (pow dx 2))
+   :dt-over-dy-square     (/ dt (pow dy 2))
+   :two-dx-dy-squares-sum (* 2.0 (+ (pow dx 2) (pow dy 2)))
+   :dx-dy-squares-over-two-dx-dy-squares-sum
+   (/ (* (pow dx 2) (pow dy 2)) (* 2.0 (+ (pow dx 2) (pow dy 2))))
+   :dt-over-two-rho-dx    (/ dt (* 2.0 rho dx))
+   :dt-over-two-rho-dy    (/ dt (* 2.0 rho dy))})
+
 (def array-u (two-d/create-init-zeros-u (assoc spatial-init-params :d-type Double/TYPE) spatial-array))
 (def array-v (two-d/clone-2d-array array-u))
 (def array-p (two-d/clone-2d-array array-u))
 (def array-b (two-d/clone-2d-array array-u))
 
+;; Now we define initial parameters:
 (def init-params
-  (assoc spatial-init-params
-         :rho rho
-         :nu nu
-         :dt dt
-         :nit nit
-         :nt nt
-         :spatial-array spatial-array
-         :array-u array-u
-         :array-v array-v
-         :array-p array-p
-         :array-b array-b))
+  (-> (merge spatial-init-params pre-calculation-params)
+      (assoc :rho rho
+             :nu nu
+             :dt dt
+             :nit nit
+             :nt nt
+             :spatial-array spatial-array
+             :array-u array-u
+             :array-v array-v
+             :array-p array-p
+             :array-b array-b)))
 ;;
 ;; The pressure Poisson equation that's written above can be hard to write out without typos.
 ;; The function `build-up-b` below represents the contents of the square brackets, so that the entirety of
 ;; the PPE is slightly more manageable.
 ;;
-(defn build-up-b [{:keys [array-b array-u array-v rho dt dx dy nx ny] :as _params}]
-  (dotimes [y-idx (- ny 2)]
-    (dotimes [x-idx (- nx 2)]
-      (let [y-idx   (inc y-idx)
-            x-idx   (inc x-idx)
-            u-i-j-1 (aget array-u (dec y-idx) x-idx)
-            u-i-j+1 (aget array-u (inc y-idx) x-idx)
-            u-j-i-1 (aget array-u y-idx (dec x-idx))
-            u-j-i+1 (aget array-u y-idx (inc x-idx))
-            v-i-j-1 (aget array-v (dec y-idx) x-idx)
-            v-i-j+1 (aget array-v (inc y-idx) x-idx)
-            v-j-i-1 (aget array-v y-idx (dec x-idx))
-            v-j-i+1 (aget array-v y-idx (inc x-idx))]
-        (aset array-b y-idx x-idx
-          (* rho
-             (- (/ (+ (/ (- u-j-i+1 u-j-i-1)
-                         (* 2.0 dx))
-                      (/ (- v-i-j+1 v-i-j-1)
-                         (* 2.0 dy)))
-                   dt)
-                (/ (pow (- u-j-i+1 u-j-i-1) 2)
-                   (pow (* 2.0 dx) 2))
-                (/ (pow (- v-i-j+1 v-i-j-1) 2)
-                   (pow (* 2.0 dy) 2))
-                (/ (* (- u-i-j+1 u-i-j-1) (- v-j-i+1 v-j-i-1))
-                   (* 2.0 dx dy))))))))
-  array-b)
+(defn build-up-b [{:keys [array-b array-u array-v rho dt dx dy nx ny
+                          x-second-end-idx y-second-end-idx
+                          two-dx
+                          two-dy
+                          two-dx-dy
+                          four-dx-square
+                          four-dy-square] :as _params}]
+  (dotimes [y-idx y-second-end-idx]
+    (dotimes [x-idx x-second-end-idx]
+      (let [;; index definitions
+            y-prev-idx y-idx
+            x-prev-idx x-idx
+            y-idx      (inc y-idx)
+            x-idx      (inc x-idx)
+            y-next-idx (inc y-idx)
+            x-next-idx (inc x-idx)
 
+            ;; extracting array values
+            u-i-j-1    (aget array-u y-prev-idx x-idx)
+            u-i-j+1    (aget array-u y-next-idx x-idx)
+            u-j-i-1    (aget array-u y-idx x-prev-idx)
+            u-j-i+1    (aget array-u y-idx x-next-idx)
+
+            v-i-j-1    (aget array-v y-prev-idx x-idx)
+            v-i-j+1    (aget array-v y-next-idx x-idx)
+            v-j-i-1    (aget array-v y-idx x-prev-idx)
+            v-j-i+1    (aget array-v y-idx x-next-idx)
+
+            ;; pre-calculations
+            u-i-diff   (- u-j-i+1 u-j-i-1)
+            u-j-diff   (- u-i-j+1 u-i-j-1)
+            v-i-diff   (- v-j-i+1 v-j-i-1)
+            v-j-diff   (- v-i-j+1 v-i-j-1)]
+        (aset array-b y-idx x-idx
+          (double
+            (* rho
+               (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
+                  (/ (* u-i-diff u-i-diff) four-dx-square)
+                  (/ (* u-j-diff v-i-diff) two-dx-dy)
+                  (/ (* v-j-diff v-j-diff) four-dy-square)))))))))
+;;
 ;; The function `pressure-poisson` is also defined to help segregate the different rounds of calculations.
 ;; Note the presence of the pseudo-time variable `nit`.
 ;; This sub-iteration in the Poisson calculation helps
 ;; ensure a divergence-free field.
 ;;
-(defn pressure-poisson [{:keys [array-p array-b nx ny dx dy nit] :as _params}]
+(defn pressure-poisson [{:keys [array-p array-b nx ny dx dy nit
+                                x-end-idx y-end-idx
+                                x-second-end-idx y-second-end-idx
+                                dx-square
+                                dy-square
+                                two-dx-dy-squares-sum
+                                dx-dy-squares-over-two-dx-dy-squares-sum]
+                         :as   _params}]
   (loop [t-idx 0]
-    (if (= t-idx nit)
-      array-p
+    (when (not= t-idx nit)
       (let [pn (two-d/clone-2d-array array-p)]
-        (dotimes [y-idx (- ny 2)]
-          (dotimes [x-idx (- nx 2)]
-            (let [y-idx   (inc y-idx)
-                  x-idx   (inc x-idx)
-                  p-i-j-1 (aget pn (dec y-idx) x-idx)
-                  p-i-j+1 (aget pn (inc y-idx) x-idx)
-                  p-j-i-1 (aget pn y-idx (dec x-idx))
-                  p-j-i+1 (aget pn y-idx (inc x-idx))]
+        (dotimes [y-idx y-second-end-idx]
+          (dotimes [x-idx x-second-end-idx]
+            (let [y-prev-idx y-idx
+                  x-prev-idx x-idx
+                  y-idx      (inc y-idx)
+                  x-idx      (inc x-idx)
+                  y-next-idx (inc y-idx)
+                  x-next-idx (inc x-idx)
+
+                  p-i-j-1    (aget pn y-prev-idx x-idx)
+                  p-i-j+1    (aget pn y-next-idx x-idx)
+                  p-j-i-1    (aget pn y-idx x-prev-idx)
+                  p-j-i+1    (aget pn y-idx x-next-idx)
+                  p-i-sum    (+ p-j-i+1 p-j-i-1)
+                  p-j-sum    (+ p-i-j+1 p-i-j-1)]
               (aset array-p y-idx x-idx
-                (- (/ (+ (* (+ p-j-i+1 p-j-i-1) (pow dy 2))
-                         (* (+ p-i-j+1 p-i-j-1) (pow dx 2)))
-                      (* 2.0 (+ (pow dx 2) (pow dy 2))))
-                   (* (/ (* (pow dx 2) (pow dy 2))
-                         (* 2.0 (+ (pow dx 2) (pow dy 2))))
-                      (aget array-b y-idx x-idx)))))))
+                (double (- (/ (+ (* p-i-sum dy-square)
+                                 (* p-j-sum dx-square))
+                              two-dx-dy-squares-sum)
+                           (* dx-dy-squares-over-two-dx-dy-squares-sum
+                              (aget array-b y-idx x-idx))))))))
         ;; boundary conditions
         ;; dp/dx = 0 at x = 2 & dp/dx = 0 at x = 0
         (dotimes [y-idx ny]
-          (aset array-p y-idx (dec nx) (aget array-p y-idx (- nx 2)))
+          (aset array-p y-idx x-end-idx (aget array-p y-idx x-second-end-idx))
           (aset array-p y-idx 0 (aget array-p y-idx 1)))
         ;; dp/dy = 0 at y = 0 & p = 0 at y = 2
         (dotimes [x-idx nx]
           (aset array-p 0 x-idx (aget array-p 1 x-idx))
-          (aset array-p (dec ny) x-idx 0.0))
+          (aset array-p y-end-idx x-idx 0.0))
         (recur (inc t-idx))))))
-
+;;
 ;; Finally, the rest of the cavity flow equations are wrapped inside the function `cavity-flow`,
 ;; allowing us to easily plot the results of the cavity flow solver for different lengths of time.
 ;;
-(defn cavity-flow [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu] :as params}]
+(defn cavity-flow [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu
+                           x-end-idx y-end-idx
+                           x-second-end-idx y-second-end-idx
+                           dt-over-dx
+                           dt-over-dy
+                           dt-over-dx-square
+                           dt-over-dy-square
+                           two-dx-dy-squares-sum
+                           dt-over-two-rho-dx
+                           dt-over-two-rho-dy] :as params}]
   (loop [n 0]
     (if (= n nt)
       params
@@ -184,146 +244,130 @@
             vn (two-d/clone-2d-array array-v)]
         (build-up-b params)
         (pressure-poisson params)
-        (dotimes [y-idx (- ny 2)]
-          (dotimes [x-idx (- nx 2)]
-            (let [y-idx   (inc y-idx)
-                  x-idx   (inc x-idx)
-                  u-i-j   (aget un y-idx x-idx)
-                  u-i-j-1 (aget un (dec y-idx) x-idx)
-                  u-i-j+1 (aget un (inc y-idx) x-idx)
-                  u-j-i-1 (aget un y-idx (dec x-idx))
-                  u-j-i+1 (aget un y-idx (inc x-idx))
-                  v-i-j   (aget vn y-idx x-idx)
-                  v-i-j-1 (aget vn (dec y-idx) x-idx)
-                  v-i-j+1 (aget vn (inc y-idx) x-idx)
-                  v-j-i-1 (aget vn y-idx (dec x-idx))
-                  v-j-i+1 (aget vn y-idx (inc x-idx))
-                  p-j-i+1 (aget array-p y-idx (inc x-idx))
-                  p-j-i-1 (aget array-p y-idx (dec x-idx))]
+        (dotimes [y-idx y-second-end-idx]
+          (dotimes [x-idx x-second-end-idx]
+            (let [y-prev-idx    y-idx
+                  x-prev-idx    x-idx
+                  y-idx         (inc y-idx)
+                  x-idx         (inc x-idx)
+                  y-next-idx    (inc y-idx)
+                  x-next-idx    (inc x-idx)
+
+                  u-i-j         (aget un y-idx x-idx)
+                  u-i-j-1       (aget un y-prev-idx x-idx)
+                  u-i-j+1       (aget un y-next-idx x-idx)
+                  u-j-i-1       (aget un y-idx x-prev-idx)
+                  u-j-i+1       (aget un y-idx x-next-idx)
+                  neg-two-u-i-j (* -2.0 u-i-j)
+
+                  v-i-j         (aget vn y-idx x-idx)
+                  v-i-j-1       (aget vn y-prev-idx x-idx)
+                  v-i-j+1       (aget vn y-next-idx x-idx)
+                  v-j-i-1       (aget vn y-idx x-prev-idx)
+                  v-j-i+1       (aget vn y-idx x-next-idx)
+                  neg-two-v-i-j (* -2.0 v-i-j)
+
+                  p-j-i+1       (aget array-p y-idx x-next-idx)
+                  p-j-i-1       (aget array-p y-idx x-prev-idx)
+                  p-i-j+1       (aget array-p y-next-idx x-idx)
+                  p-i-j-1       (aget array-p y-prev-idx x-idx)]
               (aset array-u y-idx x-idx
-                (- u-i-j
-                   (* u-i-j dt (/ 1.0 dx) (- u-i-j u-j-i-1))
-                   (* v-i-j dt (/ 1.0 dy) (- u-i-j u-j-i-1))
-                   (* dt (/ 1.0 (* 2.0 rho dx)) (- p-j-i+1 p-j-i-1))
-                   (* -1.0
-                      nu
-                      (+ (* dt
-                            (/ 1.0 (pow dx 2))
-                            (+ u-j-i+1
-                               (* -2.0 u-i-j)
-                               u-j-i-1))
-                         (* dt
-                            (/ 1.0 (pow dy 2))
-                            (+ u-i-j+1
-                               (* -2.0 u-i-j)
-                               u-i-j-1))))))
+                (double (- u-i-j
+                           (* u-i-j dt-over-dx (- u-i-j u-j-i-1))
+                           (* v-i-j dt-over-dy (- u-i-j u-i-j-1))
+                           (* dt-over-two-rho-dx (- p-j-i+1 p-j-i-1))
+                           (* -1.0 nu
+                              (+ (* dt-over-dx-square
+                                    (+ u-j-i+1 neg-two-u-i-j u-j-i-1))
+                                 (* dt-over-dy-square
+                                    (+ u-i-j+1 neg-two-u-i-j u-i-j-1)))))))
 
               (aset array-v y-idx x-idx
                 (- v-i-j
-                   (* v-i-j dt (/ 1.0 dx) (- v-i-j v-j-i-1))
-                   (* u-i-j dt (/ 1.0 dy) (- v-i-j v-j-i-1))
-                   (* dt (/ 1.0 (* 2.0 rho dy)) (- p-j-i+1 p-j-i-1))
-                   (* -1.0
-                      nu
-                      (+ (* dt
-                            (/ 1.0 (pow dx 2))
-                            (+ v-j-i+1
-                               (* -2.0 v-i-j)
-                               v-j-i-1))
-                         (* dt
-                            (/ 1.0 (pow dy 2))
-                            (+ v-i-j+1
-                               (* -2.0 v-i-j)
-                               v-i-j-1)))))))))
+                   (* v-i-j dt-over-dx (- v-i-j v-j-i-1))
+                   (* u-i-j dt-over-dy (- v-i-j v-i-j-1))
+                   (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
+                   (* -1.0 nu
+                      (+ (* dt-over-dx-square
+                            (+ v-j-i+1 neg-two-v-i-j v-j-i-1))
+                         (* dt-over-dy-square
+                            (+ v-i-j+1 neg-two-v-i-j v-i-j-1)))))))))
 
         ;; boundary conditions
         (dotimes [y-idx ny]
           (aset array-u y-idx 0 0.0)
-          (aset array-u y-idx (dec nx) 1.0)                 ;; set velocity on cavity lid equal to 1
+          (aset array-u y-idx x-end-idx 0.0)
           (aset array-v y-idx 0 0.0)
-          (aset array-v y-idx (dec nx) 0.0))
+          (aset array-v y-idx x-end-idx 0.0))
         (dotimes [x-idx nx]
           (aset array-u 0 x-idx 0.0)
-          (aset array-u (dec ny) x-idx 0.0)
-          (aset array-u 0 x-idx 0.0)
-          (aset array-v (dec ny) x-idx 0.0))
+          (aset array-u y-end-idx x-idx 1.0) ;; set velocity on cavity lid equal to 1
+          (aset array-v 0 x-idx 0.0)
+          (aset array-v y-end-idx x-idx 0.0))
         (recur (inc n))))))
 
-(defn make-plotly-quiver-annotations [{:keys [nx ny
-                                              spatial-array
-                                              array-u
-                                              array-v] :as _params}
-                                      & {:as plot-params}]
+(defn make-plotly-quiver-annotations
+  [{:keys [nx ny spatial-array array-u array-v]}
+   {:keys [step scale]}]
   (let [[array-x array-y] spatial-array
-        !annotation (transient [])
-        {:keys [step scale]} plot-params]
-    (dotimes [y-idx (int (/ ny step))]
-      (dotimes [x-idx (int (/ nx step))]
-        (let [y-idx   (* step y-idx)
-              x-idx   (* step x-idx)
-              x-arrow (aget array-x x-idx)
-              y-arrow (aget array-y y-idx)
-              u-val   (aget array-u y-idx x-idx)
-              v-val   (aget array-v y-idx x-idx)
-              x-val   (+ x-arrow (* u-val scale))
-              y-val   (+ y-arrow (* v-val scale))]
-          (conj! !annotation {:x          x-val
-                              :y          y-val
-                              :ax         x-arrow
-                              :ay         y-arrow
-                              :xref       "x"
-                              :yref       "y"
-                              :axref      "x"
-                              :ayref      "y"
-                              :arrowhead  2
-                              :arrowsize  1
-                              :arrowwidth 1.5
-                              :arrowcolor "blue"
-                              :opacity    0.5}))))
-    (persistent! !annotation)))
+        !annotations (transient [])]
+    (dotimes [yy (int (/ ny step))]
+      (dotimes [xx (int (/ nx step))]
+        (let [y-idx (* step yy)
+              x-idx (* step xx)
+              x     (aget array-x x-idx)
+              y     (aget array-y y-idx)
+              u-val (aget array-u y-idx x-idx)
+              v-val (aget array-v y-idx x-idx)
+              u     (* u-val scale)
+              v     (* v-val scale)
+              mag   (fm/sqrt (+ (* u u) (* v v)))
+              c1    (-> (* mag 50) int (min 255) (max 0))
+              c2    (-> (- 255 (* mag 50)) int (max 0) (min 255))]
+          (conj! !annotations {:x          (+ x u)
+                               :y          (+ y v)
+                               :ax         x
+                               :ay         y
+                               :xref       "x"
+                               :yref       "y"
+                               :axref      "x"
+                               :ayref      "y"
+                               :showarrow  true
+                               :arrowhead  2
+                               :arrowsize  1
+                               :arrowwidth 1.5
+                               :arrowcolor (format "rgb(%d, %d, 100)" c1 c2)
+                               :opacity    0.5}))))
+    (persistent! !annotations)))
 
-(def plot-params-default
-  {:step   2
-   :scale  0.5 ;; arrow sizes to adjust from the flow value
-   :width  600
-   :height 400})
+(def plot-params-default {:step 2 :scale 0.5 :width 600 :height 400})
 
-(defn plotly-contour-quiver-plot [{:keys [nx ny
-                                          spatial-array
-                                          array-p
-                                          array-u
-                                          array-v] :as simulated-results}
-                                  & {:as plot-params'}]
+(defn plotly-contour-quiver-plot
+  [{:keys [spatial-array array-p] :as sim}
+   & {:as plot-params'}]
   (let [[array-x array-y] spatial-array
-        contour-base-map {:x          array-x
-                          :y          array-y
-                          :z          array-p
-                          :type       "contour"
-                          :colorscale "Viridis"
-                          :contours   {:coloring "fill"}
-                          :opacity    0.5
-                          :showscale  true}
         {:keys [title width height] :as plot-params}
-        (merge plot-params-default plot-params')]
+        (merge plot-params-default plot-params')
+        contour-base {:x          array-x
+                      :y          array-y
+                      :z          array-p
+                      :type       "contour"
+                      :colorscale "Viridis"
+                      :contours   {:coloring "fill"}
+                      :opacity    0.5
+                      :showscale  true}]
     (kind/plotly
-      {:data   [(assoc contour-base-map :name "Pressure Field")
-                (-> contour-base-map
+      {:data   [(assoc contour-base :name "Pressure Field")
+                (-> contour-base
                     (assoc :name "Pressure Contours")
                     (assoc-in [:contours :coloring] "line"))]
        :layout {:title       title
-                :xaxis       {:title "X"}
-                :yaxis       {:title "Y"}
+                :xaxis       {:title "X" :range [0.0 2.0]}
+                :yaxis       {:title "Y" :range [0.0 2.0]}
                 :width       width
                 :height      height
-                :annotations (make-plotly-quiver-annotations simulated-results plot-params)}})))
-;;; nt = 100
-;^:kindly/hide-code
-;(plotly-contour-quiver-plot (cavity-flow (assoc init-params :nt 10)))
-
-(comment
-  (cavity-flow (assoc init-params :nt 18))
-
-  (clojure.pprint/pprint array-b)
-  (clojure.pprint/pprint array-u)
-  (clojure.pprint/pprint array-v)
-  (clojure.pprint/pprint array-p))
+                :annotations (make-plotly-quiver-annotations sim plot-params)}})))
+;;
+;; nt = 100
+^:kindly/hide-code
+(plotly-contour-quiver-plot (cavity-flow (assoc init-params :nt 100)))
