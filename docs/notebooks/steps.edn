@@ -19,4 +19,6 @@
  {:title "Step 9 - Laplace Equation"
   :src   "notebooks/steps/step_09.clj"}
  {:title "Step 10 - Poisson Equation"
-  :src   "notebooks/steps/step_10.clj"}]
+  :src   "notebooks/steps/step_10.clj"}
+ {:title "Step 11 - Cavity Flow with Navier-Stokes"
+  :src   "notebooks/steps/step_11.clj"}]
