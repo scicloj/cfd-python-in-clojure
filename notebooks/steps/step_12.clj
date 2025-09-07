@@ -66,34 +66,46 @@
                           four-dx-square
                           four-dy-square] :as _params}]
   (dotimes [y-idx y-second-end-idx]
-    (let [y-prev-idx  y-idx
-          y-idx       (inc y-idx)
-          y-next-idx  (inc y-idx)
+    (let [y-prev-idx                 y-idx
+          y-idx                      (inc y-idx)
+          y-next-idx                 (inc y-idx)
 
-          u-prev-x    (aget array-u y-prev-idx)
-          u-x         (aget array-u y-idx)
-          u-next-x    (aget array-u y-next-idx)
-          v-prev-x    (aget array-v y-prev-idx)
-          v-x         (aget array-v y-idx)
-          v-next-x    (aget array-v y-next-idx)
+          u-prev-x                   (aget array-u y-prev-idx)
+          u-x                        (aget array-u y-idx)
+          u-next-x                   (aget array-u y-next-idx)
+          v-prev-x                   (aget array-v y-prev-idx)
+          v-x                        (aget array-v y-idx)
+          v-next-x                   (aget array-v y-next-idx)
 
-          u-start-j   (aget u-x 0)
-          u-2nd-j     (aget u-x 1)
-          u-2nd-end-j (aget u-x x-second-end-idx)
-          u-end-j     (aget u-x x-end-idx)
-          u-start-j+1 (aget u-next-x 0)
-          u-start-j-1 (aget u-prev-x 0)
-          u-end-j+1   (aget u-next-x x-end-idx)
-          u-end-j-1   (aget u-prev-x x-end-idx)
+          u-x-start                  (aget u-x 0)
+          u-x-2nd                    (aget u-x 1)
+          u-x-2nd-end                (aget u-x x-second-end-idx)
+          u-x-end                    (aget u-x x-end-idx)
+          u-next-x-start             (aget u-next-x 0)
+          u-prev-x-start             (aget u-prev-x 0)
+          u-next-x-end               (aget u-next-x x-end-idx)
+          u-prev-x-end               (aget u-prev-x x-end-idx)
 
-          v-start-j   (aget v-x 0)
-          v-2nd-j     (aget v-x 1)
-          v-2nd-end-j (aget v-x x-second-end-idx)
-          v-end-j     (aget v-x x-end-idx)
-          v-start-j+1 (aget v-next-x 0)
-          v-start-j-1 (aget v-prev-x 0)
-          v-end-j+1   (aget v-next-x x-end-idx)
-          v-end-j-1   (aget v-prev-x x-end-idx)]
+          v-x-start                  (aget v-x 0)
+          v-x-2nd                    (aget v-x 1)
+          v-x-2nd-end                (aget v-x x-second-end-idx)
+          v-x-end                    (aget v-x x-end-idx)
+          v-next-x-start             (aget v-next-x 0)
+          v-prev-x-start             (aget v-prev-x 0)
+          v-next-x-end               (aget v-next-x x-end-idx)
+          v-prev-x-end               (aget v-prev-x x-end-idx)
+
+          u-x-start-end-diff         (- u-x-start u-x-2nd-end)
+          u-x-start-end-diff-sqr     (* u-x-start-end-diff u-x-start-end-diff)
+
+          v-next-prev-end-diff       (- v-next-x-end v-prev-x-end)
+          v-next-prev-end-diff-sqr   (* v-next-prev-end-diff v-next-prev-end-diff)
+
+          u-x-2nd-end-diff           (- u-x-2nd u-x-end)
+          u-x-2nd-end-diff-sqr       (* u-x-2nd-end-diff u-x-2nd-end-diff)
+
+          v-next-prev-start-diff     (- v-next-x-start v-prev-x-start)
+          v-next-prev-start-diff-sqr (* v-next-prev-start-diff v-next-prev-start-diff)]
       (dotimes [x-idx x-second-end-idx]
         (let [;; index definitions
               x-prev-idx x-idx
@@ -117,52 +129,45 @@
               v-i-diff   (- v-j-i+1 v-j-i-1)
               v-j-diff   (- v-i-j+1 v-i-j-1)]
           (aset array-b y-idx x-idx
-            (double
-              (* rho
-                 (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
-                    (/ (* u-i-diff u-i-diff) four-dx-square)
-                    (/ (* u-j-diff v-i-diff) two-dx-dy)
-                    (/ (* v-j-diff v-j-diff) four-dy-square)))))))
+            (double (* rho
+                       (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
+                          (/ (* u-i-diff u-i-diff) four-dx-square)
+                          (/ (* u-j-diff v-i-diff) two-dx-dy)
+                          (/ (* v-j-diff v-j-diff) four-dy-square)))))))
 
       ;; Periodic BC Pressure @ x = 2
       (aset array-b y-idx x-end-idx
         (double (* rho
-                   (- (/ (+ (/ (- u-start-j u-2nd-end-j) two-dx)
-                            (/ (- v-end-j+1 v-end-j-1) two-dy))
+                   (- (/ (+ (/ u-x-start-end-diff two-dx)
+                            (/ v-next-prev-end-diff two-dy))
                          dt)
-                      (/ (* (- u-start-j u-2nd-end-j)) four-dx-square)
-                      (/ (* (- u-end-j+1 u-end-j-1)
-                            (- v-start-j v-2nd-end-j))
-                         two-dx-dy)
-                      (/ (- v-end-j+1 v-end-j-1)
-                         four-dy-square)))))
+                      (/ u-x-start-end-diff-sqr four-dx-square)
+                      (/ (* (- u-next-x-end u-prev-x-end) (- v-x-start v-x-2nd-end)) two-dx-dy)
+                      (/ v-next-prev-end-diff-sqr four-dy-square)))))
 
       ;; Periodic BC Pressure @ x = 0
       (aset array-b y-idx 0
         (double (* rho
-                   (* rho
-                      (- (/ (+ (/ (- u-2nd-j u-end-j) two-dx)
-                               (/ (- v-start-j+1 v-start-j-1) two-dy))
-                            dt)
-                         (/ (* (- u-2nd-j u-end-j)) four-dx-square)
-                         (/ (* (- u-start-j+1 u-start-j-1)
-                               (- v-2nd-j v-end-j))
-                            two-dx-dy)
-                         (/ (- v-start-j+1 v-start-j-1)
-                            four-dy-square)))))))))
+                   (- (/ (+ (/ u-x-2nd-end-diff two-dx)
+                            (/ v-next-prev-start-diff two-dy))
+                         dt)
+                      (/ u-x-2nd-end-diff-sqr four-dx-square)
+                      (/ (* (- u-next-x-start u-prev-x-start) (- v-x-2nd v-x-end)) two-dx-dy)
+                      (/ v-next-prev-start-diff-sqr four-dy-square))))))))
 ;;
 ;; We'll also define a Pressure Poisson iterative function, again like we did in Step 11.
-;; Once more, note that we have to include the periodic boundary conditions at the leading and trailing
-;; edge. We also have to specify the boundary conditions at the top and bottom of our grid.
+;; Once more, note that we have to include the periodic boundary conditions at the leading and
+;; trailing edge.
+;; We also have to specify the boundary conditions at the top and bottom of our grid.
 ;;
-(defn pressure-poisson [{:keys [array-p array-b nx ny dx dy nit
-                                x-end-idx y-end-idx
-                                x-second-end-idx y-second-end-idx
-                                dx-square
-                                dy-square
-                                two-dx-dy-squares-sum
-                                dx-dy-squares-over-two-dx-dy-squares-sum]
-                         :as   _params}]
+(defn pressure-poisson-periodic [{:keys [array-p array-b nx ny dx dy nit
+                                         x-end-idx y-end-idx
+                                         x-second-end-idx y-second-end-idx
+                                         dx-square
+                                         dy-square
+                                         two-dx-dy-squares-sum
+                                         dx-dy-squares-over-two-dx-dy-squares-sum]
+                                  :as   _params}]
   (dotimes [_ nit]
     (let [pn (two-d/clone-2d-array array-p)]
       (dotimes [y-idx y-second-end-idx]
@@ -175,47 +180,42 @@
               pn-next-x  (aget pn y-next-idx)
               array-b-x  (aget array-b y-idx)]
           (dotimes [x-idx x-second-end-idx]
-            (let [x-prev-idx x-idx
-                  x-idx      (inc x-idx)
-                  x-next-idx (inc x-idx)
+            (let [x-prev-idx   x-idx
+                  x-idx        (inc x-idx)
+                  x-next-idx   (inc x-idx)
 
-                  p-i-j-1    (aget pn-prev-x x-idx)
-                  p-i-j+1    (aget pn-next-x x-idx)
-                  p-j-i-1    (aget pn-x x-prev-idx)
-                  p-j-i+1    (aget pn-x x-next-idx)
-                  p-i-sum    (+ p-j-i+1 p-j-i-1)
-                  p-j-sum    (+ p-i-j+1 p-i-j-1)]
+                  p-i-j-1      (aget pn-prev-x x-idx)
+                  p-i-j+1      (aget pn-next-x x-idx)
+                  p-j-i-1      (aget pn-x x-prev-idx)
+                  p-j-i+1      (aget pn-x x-next-idx)
+                  p-i-diff-sum (+ p-j-i+1 p-j-i-1)
+                  p-j-diff-sum (+ p-i-j+1 p-i-j-1)]
               (aset array-p y-idx x-idx
-                (double (- (/ (+ (* p-i-sum dy-square)
-                                 (* p-j-sum dx-square))
+                (double (- (/ (+ (* p-i-diff-sum dy-square)
+                                 (* p-j-diff-sum dx-square))
                               two-dx-dy-squares-sum)
                            (* dx-dy-squares-over-two-dx-dy-squares-sum
-                              (aget array-b y-idx x-idx)))))))
+                              (aget array-b-x x-idx)))))))
 
           ;; Periodic BC Pressure @ x = 2
           (aset array-p y-idx x-end-idx
-            (double (- (/ (+ (* (+ (aget pn-x 0) (aget pn-x x-second-end-idx))
-                                dy-square)
-                             (* (+ (aget pn-next-x x-end-idx) (aget pn-prev-x x-end-idx))
-                                dx-square))
+            (double (- (/ (+ (* (+ (aget pn-x 0) (aget pn-x x-second-end-idx)) dy-square)
+                             (* (+ (aget pn-next-x x-end-idx) (aget pn-prev-x x-end-idx)) dx-square))
                           two-dx-dy-squares-sum)
                        (* dx-dy-squares-over-two-dx-dy-squares-sum
                           (aget array-b-x x-end-idx)))))
 
           ;; Periodic BC Pressure @ x = 0
           (aset array-p y-idx 0
-            (double (- (/ (+ (* (+ (aget pn-x 1) (aget pn-x x-end-idx))
-                                dy-square)
-                             (* (+ (aget pn-next-x 0) (aget pn-prev-x 0))
-                                dx-square))
+            (double (- (/ (+ (* (+ (aget pn-x 1) (aget pn-x x-end-idx)) dy-square)
+                             (* (+ (aget pn-next-x 0) (aget pn-prev-x 0)) dx-square))
                           two-dx-dy-squares-sum)
                        (* dx-dy-squares-over-two-dx-dy-squares-sum
                           (aget array-b-x 0)))))))
 
       ;; Wall boundary conditions, pressure
-      (dotimes [x-idx nx]
-        (aset array-p y-end-idx x-idx (aget array-p y-second-end-idx x-idx))
-        (aset array-p 0 x-idx (aget array-p 1 x-idx))))))
+      (aset array-p y-end-idx (aget array-p y-second-end-idx))
+      (aset array-p 0 (aget array-p 1)))))
 ;;
 ;; Now we have our familiar list of variables and initial conditions to declare before we start.
 ;;
@@ -304,27 +304,24 @@
 (def !step-count (atom 0))
 (def !u-diff (atom default-u-diff))
 ;;
-(defn simulate-flow [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu
-                             x-end-idx y-end-idx
-                             x-second-end-idx y-second-end-idx
-                             dt-over-dx
-                             dt-over-dy
-                             dt-over-dx-square
-                             dt-over-dy-square
-                             two-dx-dy-squares-sum
-                             dt-over-two-rho-dx
-                             dt-over-two-rho-dy
-                             dt-F] :as params}]
+(defn cavity-flow-periodic [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu
+                                    x-end-idx y-end-idx
+                                    x-second-end-idx y-second-end-idx
+                                    dt-over-dx
+                                    dt-over-dy
+                                    dt-over-dx-square
+                                    dt-over-dy-square
+                                    two-dx-dy-squares-sum
+                                    dt-over-two-rho-dx
+                                    dt-over-two-rho-dy
+                                    dt-F]
+                             :as   params}]
   (let [neg-dt-F (- dt-F)]
     (while (> @!u-diff 1e-3)
-      (spit
-        (str @!step-count ".txt")
-        (with-out-str (clojure.pprint/pprint [array-p array-u array-v])))
       (let [un (two-d/clone-2d-array array-u)
             vn (two-d/clone-2d-array array-v)]
         (build-up-b params)
-        (pressure-poisson params)
-
+        (pressure-poisson-periodic params)
         (dotimes [y-idx y-second-end-idx]
           (let [y-prev-idx y-idx
                 y-idx      (inc y-idx)
@@ -333,9 +330,11 @@
                 un-prev-x  (aget un y-prev-idx)
                 un-x       (aget un y-idx)
                 un-next-x  (aget un y-next-idx)
+
                 vn-prev-x  (aget vn y-prev-idx)
                 vn-x       (aget vn y-idx)
                 vn-next-x  (aget vn y-next-idx)
+
                 p-prev-x   (aget array-p y-prev-idx)
                 p-x        (aget array-p y-idx)
                 p-next-x   (aget array-p y-next-idx)]
@@ -367,7 +366,7 @@
                              (* u-i-j dt-over-dx (- u-i-j u-j-i-1))
                              (* v-i-j dt-over-dy (- u-i-j u-i-j-1))
                              (* dt-over-two-rho-dx (- p-j-i+1 p-j-i-1))
-                             (* -1.0 nu
+                             (* (- nu)
                                 (+ (* dt-over-dx-square
                                       (+ u-j-i+1 neg-two-u-i-j u-j-i-1))
                                    (* dt-over-dy-square
@@ -379,33 +378,39 @@
                              (* v-i-j dt-over-dx (- v-i-j v-j-i-1))
                              (* u-i-j dt-over-dy (- v-i-j v-i-j-1))
                              (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
-                             (* -1.0 nu
+                             (* (- nu)
                                 (+ (* dt-over-dx-square
                                       (+ v-j-i+1 neg-two-v-i-j v-j-i-1))
                                    (* dt-over-dy-square
                                       (+ v-i-j+1 neg-two-v-i-j v-i-j-1)))))))))
 
             ;; Boundary conditions
-            (let [un-x-end          (aget un-x x-end-idx)
-                  un-x-2nd-end      (aget un-x x-second-end-idx)
-                  un-x-start        (aget un-x 0)
-                  un-prev-x-start   (aget un-prev-x 0)
-                  un-prev-x-end     (aget un-prev-x x-end-idx)
-                  un-next-x-2nd-end (aget un-next-x x-second-end-idx)
-                  un-next-x-start   (aget un-next-x 0)
+            (let [un-x-end        (aget un-x x-end-idx)
+                  un-x-2nd-end    (aget un-x x-second-end-idx)
+                  un-x-start      (aget un-x 0)
+                  un-x-2nd        (aget un-x 1)
+                  un-prev-x-start (aget un-prev-x 0)
+                  un-prev-x-end   (aget un-prev-x x-end-idx)
+                  un-next-x-end   (aget un-next-x x-end-idx)
+                  un-next-x-start (aget un-next-x 0)
 
-                  vn-x-end          (aget vn-x x-end-idx)
-                  vn-x-2nd-end      (aget vn-x x-second-end-idx)
-                  vn-x-start        (aget vn-x 0)
-                  vn-prev-x-start   (aget vn-prev-x 0)
-                  vn-prev-x-end     (aget vn-prev-x x-end-idx)
-                  vn-next-x-end     (aget vn-next-x x-end-idx)
-                  vn-next-x-start   (aget vn-next-x 0)
+                  vn-x-end        (aget vn-x x-end-idx)
+                  vn-x-2nd-end    (aget vn-x x-second-end-idx)
+                  vn-x-start      (aget vn-x 0)
+                  vn-x-2nd        (aget vn-x 1)
+                  vn-prev-x-start (aget vn-prev-x 0)
+                  vn-prev-x-end   (aget vn-prev-x x-end-idx)
+                  vn-next-x-end   (aget vn-next-x x-end-idx)
+                  vn-next-x-start (aget vn-next-x 0)
 
-                  p-x-start         (aget p-x 0)
-                  p-x-2nd-end       (aget p-x x-second-end-idx)
-                  p-next-x-start    (aget p-next-x 0)
-                  p-prev-x-end      (aget p-prev-x x-end-idx)]
+                  p-x-start       (aget p-x 0)
+                  p-x-2nd         (aget p-x 1)
+                  p-x-end         (aget p-x x-end-idx)
+                  p-x-2nd-end     (aget p-x x-second-end-idx)
+                  p-next-x-start  (aget p-next-x 0)
+                  p-next-x-end    (aget p-next-x x-end-idx)
+                  p-prev-x-start  (aget p-prev-x 0)
+                  p-prev-x-end    (aget p-prev-x x-end-idx)]
 
               ;; Periodic BC u @ x = 2
               (aset array-u y-idx x-end-idx
@@ -417,7 +422,7 @@
                               (+ (* dt-over-dx-square
                                     (+ un-x-start (* -2.0 un-x-end) un-x-2nd-end))
                                  (* dt-over-dy-square
-                                    (+ un-next-x-2nd-end (* -2.0 un-x-end) un-prev-x-end))))
+                                    (+ un-next-x-end (* -2.0 un-x-end) un-prev-x-end))))
                            neg-dt-F)))
 
               ;; Periodic BC u @ x = 0
@@ -425,10 +430,10 @@
                 (double (- un-x-start
                            (* un-x-start dt-over-dx (- un-x-start un-x-end))
                            (* vn-x-start dt-over-dy (- un-x-start un-prev-x-start))
-                           (* dt-over-two-rho-dx (- p-next-x-start p-prev-x-end))
+                           (* dt-over-two-rho-dx (- p-x-2nd p-x-end))
                            (* (- nu)
                               (+ (* dt-over-dx-square
-                                    (+ un-x-start (* -2.0 un-x-start) un-x-end))
+                                    (+ un-x-2nd (* -2.0 un-x-start) un-x-end))
                                  (* dt-over-dy-square
                                     (+ un-next-x-start (* -2.0 un-x-start) un-prev-x-start))))
                            neg-dt-F)))
@@ -436,9 +441,9 @@
               ;; Periodic BC v @ x = 2
               (aset array-v y-idx x-end-idx
                 (double (- vn-x-end
-                           (* vn-x-end dt-over-dx (- vn-x-end vn-x-2nd-end))
-                           (* un-x-end dt-over-dy (- vn-x-end vn-prev-x-end))
-                           (* dt-over-two-rho-dx (- p-x-start p-x-2nd-end))
+                           (* un-x-end dt-over-dx (- vn-x-end vn-x-2nd-end))
+                           (* vn-x-end dt-over-dy (- vn-x-end vn-prev-x-end))
+                           (* dt-over-two-rho-dy (- p-next-x-end p-prev-x-end))
                            (* (- nu)
                               (+ (* dt-over-dx-square
                                     (+ vn-x-start (* -2.0 vn-x-end) vn-x-2nd-end))
@@ -446,14 +451,14 @@
                                     (+ vn-next-x-end (* -2.0 vn-x-end) vn-prev-x-end)))))))
 
               ;; Periodic BC v @ x = 0
-              (aset array-u y-idx 0
+              (aset array-v y-idx 0
                 (double (- vn-x-start
-                           (* vn-x-start dt-over-dx (- vn-x-start vn-x-end))
-                           (* un-x-start dt-over-dy (- vn-x-start vn-prev-x-start))
-                           (* dt-over-two-rho-dx (- p-next-x-start p-prev-x-end))
+                           (* un-x-start dt-over-dx (- vn-x-start vn-x-end))
+                           (* vn-x-start dt-over-dy (- vn-x-start vn-prev-x-start))
+                           (* dt-over-two-rho-dy (- p-next-x-start p-prev-x-start))
                            (* (- nu)
                               (+ (* dt-over-dx-square
-                                    (+ vn-x-start (* -2.0 vn-x-start) vn-x-end))
+                                    (+ vn-x-2nd (* -2.0 vn-x-start) vn-x-end))
                                  (* dt-over-dy-square
                                     (+ vn-next-x-start (* -2.0 vn-x-start) vn-prev-x-start))))))))))
 
@@ -466,21 +471,15 @@
 
         (let [sum-u  (reduce + 0.0 (mapcat identity array-u))
               sum-un (reduce + 0.0 (mapcat identity un))
-              u-diff (/ (- sum-u sum-un) sum-u)]
+              u-diff (if (zero? sum-u) 0.0 (/ (- sum-u sum-un) sum-u))]
           (reset! !u-diff u-diff))
         (swap! !step-count inc)))))
 ;;
 ;; Run the simulation
-(simulate-flow init-params)
+(cavity-flow-periodic init-params)
 ;;
 ;; You can see that we've also included `!step-count` to see how many iterations our loop
 ;; went through before our stop condition was met.
 ;;
+(two-d/plotly-quiver-plot init-params)
 
-(comment
-  (simulate-flow init-params)
-
-  (clojure.pprint/pprint array-b)
-  (clojure.pprint/pprint array-p)
-  (clojure.pprint/pprint array-u)
-  (clojure.pprint/pprint array-v))

@@ -1,5 +1,6 @@
 (ns cfd.two-d
   (:require
+   [fastmath.core :as fm]
    [scicloj.kindly.v4.kind :as kind]
    [tech.v3.datatype :as dt]
    [tech.v3.tensor :as dtt]
@@ -298,3 +299,95 @@
        (cond-> {:data   [(merge plottable-data plotly-opts)]
                 :layout {:scene {:zaxis {:range [0.8 2.2]}}}}
          (fn? update-fn) (update-fn))))))
+
+(defn make-plotly-quiver-annotations
+  [{:keys [nx ny spatial-array array-u array-v]}
+   {:keys [step scale]}]
+  (let [[array-x array-y] spatial-array
+        !annotations (transient [])]
+    (dotimes [yy (int (/ ny step))]
+      (dotimes [xx (int (/ nx step))]
+        (let [y-idx (* step yy)
+              x-idx (* step xx)
+              x     (aget array-x x-idx)
+              y     (aget array-y y-idx)
+              u-val (aget array-u y-idx x-idx)
+              v-val (aget array-v y-idx x-idx)
+              u     (* u-val scale)
+              v     (* v-val scale)
+              mag   (fm/sqrt (+ (* u u) (* v v)))
+              c1    (-> (* mag 50) int (min 255) (max 0))
+              c2    (-> (- 255 (* mag 50)) int (max 0) (min 255))]
+          (conj! !annotations {:x          (+ x u)
+                               :y          (+ y v)
+                               :ax         x
+                               :ay         y
+                               :xref       "x"
+                               :yref       "y"
+                               :axref      "x"
+                               :ayref      "y"
+                               :showarrow  true
+                               :arrowhead  2
+                               :arrowsize  1
+                               :arrowwidth 1.5
+                               :arrowcolor (format "rgb(%d, %d, 100)" c1 c2)
+                               :opacity    0.5}))))
+    (persistent! !annotations)))
+
+(def plot-params-default
+  {:step        2
+   :scale       0.5
+   :width       600
+   :height      400
+   :marker-size 1
+   :opacity     0.5})
+
+(defn plotly-contour-quiver-plot
+  [{:keys [spatial-array array-p
+           x-start x-end y-start y-end] :as sim}
+   & {:as plot-params'}]
+  (let [[array-x array-y] spatial-array
+        {:keys [title width height opacity] :as plot-params}
+        (merge plot-params-default plot-params')
+        contour-base {:x          array-x
+                      :y          array-y
+                      :z          array-p
+                      :type       "contour"
+                      :colorscale "Viridis"
+                      :contours   {:coloring "fill"}
+                      :opacity    opacity
+                      :showscale  true}]
+    (kind/plotly
+      {:data   [(assoc contour-base :name "Pressure Field")
+                (-> contour-base
+                    (assoc :name "Pressure Contours")
+                    (assoc-in [:contours :coloring] "line"))]
+       :layout {:title       title
+                :xaxis       {:title "X" :range [x-start x-end]}
+                :yaxis       {:title "Y" :range [y-start y-end]}
+                :width       width
+                :height      height
+                :annotations (make-plotly-quiver-annotations sim plot-params)}})))
+
+(defn plotly-quiver-plot
+  [{:keys [spatial-array array-p
+           x-start x-end y-start y-end] :as sim}
+   & {:as plot-params'}]
+  (let [[array-x array-y] spatial-array
+        {:keys [title width height opacity marker-size] :as plot-params}
+        (merge plot-params-default plot-params')
+        scatter-base {:x       array-x
+                      :y       array-y
+                      :z       array-p
+                      :mode    "markers"
+                      :type    "scatter"
+                      :marker  {:size marker-size}
+                      :opacity opacity}]
+    (kind/plotly
+      {:data   [scatter-base]
+       :layout {:title       title
+                :xaxis       {:title "X" :range [x-start x-end]}
+                :yaxis       {:title "Y" :range [y-start y-end]}
+                :width       width
+                :height      height
+                :annotations (make-plotly-quiver-annotations sim plot-params)}})))

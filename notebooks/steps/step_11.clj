@@ -305,69 +305,7 @@
           (aset array-v 0 x-idx 0.0)
           (aset array-v y-end-idx x-idx 0.0))
         (recur (inc n))))))
-
-(defn make-plotly-quiver-annotations
-  [{:keys [nx ny spatial-array array-u array-v]}
-   {:keys [step scale]}]
-  (let [[array-x array-y] spatial-array
-        !annotations (transient [])]
-    (dotimes [yy (int (/ ny step))]
-      (dotimes [xx (int (/ nx step))]
-        (let [y-idx (* step yy)
-              x-idx (* step xx)
-              x     (aget array-x x-idx)
-              y     (aget array-y y-idx)
-              u-val (aget array-u y-idx x-idx)
-              v-val (aget array-v y-idx x-idx)
-              u     (* u-val scale)
-              v     (* v-val scale)
-              mag   (fm/sqrt (+ (* u u) (* v v)))
-              c1    (-> (* mag 50) int (min 255) (max 0))
-              c2    (-> (- 255 (* mag 50)) int (max 0) (min 255))]
-          (conj! !annotations {:x          (+ x u)
-                               :y          (+ y v)
-                               :ax         x
-                               :ay         y
-                               :xref       "x"
-                               :yref       "y"
-                               :axref      "x"
-                               :ayref      "y"
-                               :showarrow  true
-                               :arrowhead  2
-                               :arrowsize  1
-                               :arrowwidth 1.5
-                               :arrowcolor (format "rgb(%d, %d, 100)" c1 c2)
-                               :opacity    0.5}))))
-    (persistent! !annotations)))
-
-(def plot-params-default {:step 2 :scale 0.5 :width 600 :height 400})
-
-(defn plotly-contour-quiver-plot
-  [{:keys [spatial-array array-p] :as sim}
-   & {:as plot-params'}]
-  (let [[array-x array-y] spatial-array
-        {:keys [title width height] :as plot-params}
-        (merge plot-params-default plot-params')
-        contour-base {:x          array-x
-                      :y          array-y
-                      :z          array-p
-                      :type       "contour"
-                      :colorscale "Viridis"
-                      :contours   {:coloring "fill"}
-                      :opacity    0.5
-                      :showscale  true}]
-    (kind/plotly
-      {:data   [(assoc contour-base :name "Pressure Field")
-                (-> contour-base
-                    (assoc :name "Pressure Contours")
-                    (assoc-in [:contours :coloring] "line"))]
-       :layout {:title       title
-                :xaxis       {:title "X" :range [0.0 2.0]}
-                :yaxis       {:title "Y" :range [0.0 2.0]}
-                :width       width
-                :height      height
-                :annotations (make-plotly-quiver-annotations sim plot-params)}})))
 ;;
 ;; nt = 100
 ^:kindly/hide-code
-(plotly-contour-quiver-plot (cavity-flow (assoc init-params :nt 100)))
+(two-d/plotly-contour-quiver-plot (cavity-flow (assoc init-params :nt 100)))
