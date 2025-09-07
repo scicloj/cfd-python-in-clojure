@@ -136,6 +136,7 @@
 ;; the PPE is slightly more manageable.
 ;;
 (defn build-up-b [{:keys [array-b array-u array-v rho dt dx dy nx ny
+                          x-end-idx y-end-idx
                           x-second-end-idx y-second-end-idx
                           two-dx
                           two-dy
@@ -143,44 +144,51 @@
                           four-dx-square
                           four-dy-square] :as _params}]
   (dotimes [y-idx y-second-end-idx]
-    (dotimes [x-idx x-second-end-idx]
-      (let [;; index definitions
-            y-prev-idx y-idx
-            x-prev-idx x-idx
-            y-idx      (inc y-idx)
-            x-idx      (inc x-idx)
-            y-next-idx (inc y-idx)
-            x-next-idx (inc x-idx)
+    (let [y-prev-idx y-idx
+          y-idx      (inc y-idx)
+          y-next-idx (inc y-idx)
 
-            ;; extracting array values
-            u-i-j-1    (aget array-u y-prev-idx x-idx)
-            u-i-j+1    (aget array-u y-next-idx x-idx)
-            u-j-i-1    (aget array-u y-idx x-prev-idx)
-            u-j-i+1    (aget array-u y-idx x-next-idx)
+          u-prev-x   (aget array-u y-prev-idx)
+          u-x        (aget array-u y-idx)
+          u-next-x   (aget array-u y-next-idx)
+          v-prev-x   (aget array-v y-prev-idx)
+          v-x        (aget array-v y-idx)
+          v-next-x   (aget array-v y-next-idx)]
+      (dotimes [x-idx x-second-end-idx]
+        (let [;; index definitions
+              x-prev-idx x-idx
+              x-idx      (inc x-idx)
+              x-next-idx (inc x-idx)
 
-            v-i-j-1    (aget array-v y-prev-idx x-idx)
-            v-i-j+1    (aget array-v y-next-idx x-idx)
-            v-j-i-1    (aget array-v y-idx x-prev-idx)
-            v-j-i+1    (aget array-v y-idx x-next-idx)
+              ;; extracting array values
+              u-i-j-1    (aget u-prev-x x-idx)
+              u-i-j+1    (aget u-next-x x-idx)
+              u-j-i-1    (aget u-x x-prev-idx)
+              u-j-i+1    (aget u-x x-next-idx)
 
-            ;; pre-calculations
-            u-i-diff   (- u-j-i+1 u-j-i-1)
-            u-j-diff   (- u-i-j+1 u-i-j-1)
-            v-i-diff   (- v-j-i+1 v-j-i-1)
-            v-j-diff   (- v-i-j+1 v-i-j-1)]
-        (aset array-b y-idx x-idx
-          (double
-            (* rho
-               (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
-                  (/ (* u-i-diff u-i-diff) four-dx-square)
-                  (/ (* u-j-diff v-i-diff) two-dx-dy)
-                  (/ (* v-j-diff v-j-diff) four-dy-square)))))))))
+              v-i-j-1    (aget v-prev-x x-idx)
+              v-i-j+1    (aget v-next-x x-idx)
+              v-j-i-1    (aget v-x x-prev-idx)
+              v-j-i+1    (aget v-x x-next-idx)
+
+              ;; pre-calculations
+              u-i-diff   (- u-j-i+1 u-j-i-1)
+              u-j-diff   (- u-i-j+1 u-i-j-1)
+              v-i-diff   (- v-j-i+1 v-j-i-1)
+              v-j-diff   (- v-i-j+1 v-i-j-1)]
+          (aset array-b y-idx x-idx
+            (double (* rho
+                       (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
+                          (/ (* u-i-diff u-i-diff) four-dx-square)
+                          (/ (* u-j-diff v-i-diff) two-dx-dy)
+                          (/ (* v-j-diff v-j-diff) four-dy-square))))))))))
 ;;
 ;; The function `pressure-poisson` is also defined to help segregate the different rounds of calculations.
 ;; Note the presence of the pseudo-time variable `nit`.
 ;; This sub-iteration in the Poisson calculation helps
 ;; ensure a divergence-free field.
 ;;
+
 (defn pressure-poisson [{:keys [array-p array-b nx ny dx dy nit
                                 x-end-idx y-end-idx
                                 x-second-end-idx y-second-end-idx
@@ -189,44 +197,52 @@
                                 two-dx-dy-squares-sum
                                 dx-dy-squares-over-two-dx-dy-squares-sum]
                          :as   _params}]
-  (loop [t-idx 0]
-    (when (not= t-idx nit)
-      (let [pn (two-d/clone-2d-array array-p)]
-        (dotimes [y-idx y-second-end-idx]
-          (dotimes [x-idx x-second-end-idx]
-            (let [y-prev-idx y-idx
-                  x-prev-idx x-idx
-                  y-idx      (inc y-idx)
-                  x-idx      (inc x-idx)
-                  y-next-idx (inc y-idx)
-                  x-next-idx (inc x-idx)
+  (dotimes [_ nit]
+    (let [pn (two-d/clone-2d-array array-p)]
+      (dotimes [y-idx y-second-end-idx]
+        (let [y-prev-idx y-idx
+              y-idx      (inc y-idx)
+              y-next-idx (inc y-idx)
 
-                  p-i-j-1    (aget pn y-prev-idx x-idx)
-                  p-i-j+1    (aget pn y-next-idx x-idx)
-                  p-j-i-1    (aget pn y-idx x-prev-idx)
-                  p-j-i+1    (aget pn y-idx x-next-idx)
-                  p-i-sum    (+ p-j-i+1 p-j-i-1)
-                  p-j-sum    (+ p-i-j+1 p-i-j-1)]
+              pn-x       (aget pn y-idx)
+              pn-prev-x  (aget pn y-prev-idx)
+              pn-next-x  (aget pn y-next-idx)
+              array-b-x  (aget array-b y-idx)]
+          (dotimes [x-idx x-second-end-idx]
+            (let [x-prev-idx   x-idx
+                  x-idx        (inc x-idx)
+                  x-next-idx   (inc x-idx)
+
+                  p-i-j-1      (aget pn-prev-x x-idx)
+                  p-i-j+1      (aget pn-next-x x-idx)
+                  p-j-i-1      (aget pn-x x-prev-idx)
+                  p-j-i+1      (aget pn-x x-next-idx)
+                  p-i-diff-sum (+ p-j-i+1 p-j-i-1)
+                  p-j-diff-sum (+ p-i-j+1 p-i-j-1)]
               (aset array-p y-idx x-idx
-                (double (- (/ (+ (* p-i-sum dy-square)
-                                 (* p-j-sum dx-square))
+                (double (- (/ (+ (* p-i-diff-sum dy-square)
+                                 (* p-j-diff-sum dx-square))
                               two-dx-dy-squares-sum)
                            (* dx-dy-squares-over-two-dx-dy-squares-sum
-                              (aget array-b y-idx x-idx))))))))
-        ;; boundary conditions
-        ;; dp/dx = 0 at x = 2 & dp/dx = 0 at x = 0
-        (dotimes [y-idx ny]
-          (aset array-p y-idx x-end-idx (aget array-p y-idx x-second-end-idx))
-          (aset array-p y-idx 0 (aget array-p y-idx 1)))
-        ;; dp/dy = 0 at y = 0 & p = 0 at y = 2
-        (dotimes [x-idx nx]
-          (aset array-p 0 x-idx (aget array-p 1 x-idx))
-          (aset array-p y-end-idx x-idx 0.0))
-        (recur (inc t-idx))))))
+                              (aget array-b-x x-idx)))))))))
+
+      ;; boundary conditions
+      ;; dp/dx = 0 at x = 2 & dp/dx = 0 at x = 0
+      (dotimes [y-idx ny]
+        (aset array-p y-idx x-end-idx (aget array-p y-idx x-second-end-idx))
+        (aset array-p y-idx 0 (aget array-p y-idx 1)))
+
+      ;; dp/dy = 0 at y = 0 & p = 0 at y = 2
+      (dotimes [x-idx nx]
+        (aset array-p 0 x-idx (aget array-p 1 x-idx))
+        (aset array-p y-end-idx x-idx 0.0)))))
+
 ;;
 ;; Finally, the rest of the cavity flow equations are wrapped inside the function `cavity-flow`,
 ;; allowing us to easily plot the results of the cavity flow solver for different lengths of time.
 ;;
+(def !nt (atom 0))
+
 (defn cavity-flow [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu
                            x-end-idx y-end-idx
                            x-second-end-idx y-second-end-idx
@@ -237,75 +253,88 @@
                            two-dx-dy-squares-sum
                            dt-over-two-rho-dx
                            dt-over-two-rho-dy] :as params}]
-  (loop [n 0]
-    (if (= n nt)
-      params
-      (let [un (two-d/clone-2d-array array-u)
-            vn (two-d/clone-2d-array array-v)]
-        (build-up-b params)
-        (pressure-poisson params)
-        (dotimes [y-idx y-second-end-idx]
-          (dotimes [x-idx x-second-end-idx]
-            (let [y-prev-idx    y-idx
-                  x-prev-idx    x-idx
-                  y-idx         (inc y-idx)
-                  x-idx         (inc x-idx)
-                  y-next-idx    (inc y-idx)
-                  x-next-idx    (inc x-idx)
+  (while (< @!nt nt)
+   (let [un (two-d/clone-2d-array array-u)
+         vn (two-d/clone-2d-array array-v)]
+     (build-up-b params)
+     (pressure-poisson params)
 
-                  u-i-j         (aget un y-idx x-idx)
-                  u-i-j-1       (aget un y-prev-idx x-idx)
-                  u-i-j+1       (aget un y-next-idx x-idx)
-                  u-j-i-1       (aget un y-idx x-prev-idx)
-                  u-j-i+1       (aget un y-idx x-next-idx)
-                  neg-two-u-i-j (* -2.0 u-i-j)
+     (dotimes [y-idx y-second-end-idx]
+       (let [y-prev-idx y-idx
+             y-idx      (inc y-idx)
+             y-next-idx (inc y-idx)
 
-                  v-i-j         (aget vn y-idx x-idx)
-                  v-i-j-1       (aget vn y-prev-idx x-idx)
-                  v-i-j+1       (aget vn y-next-idx x-idx)
-                  v-j-i-1       (aget vn y-idx x-prev-idx)
-                  v-j-i+1       (aget vn y-idx x-next-idx)
-                  neg-two-v-i-j (* -2.0 v-i-j)
+             un-prev-x  (aget un y-prev-idx)
+             un-x       (aget un y-idx)
+             un-next-x  (aget un y-next-idx)
 
-                  p-j-i+1       (aget array-p y-idx x-next-idx)
-                  p-j-i-1       (aget array-p y-idx x-prev-idx)
-                  p-i-j+1       (aget array-p y-next-idx x-idx)
-                  p-i-j-1       (aget array-p y-prev-idx x-idx)]
-              (aset array-u y-idx x-idx
-                (double (- u-i-j
-                           (* u-i-j dt-over-dx (- u-i-j u-j-i-1))
-                           (* v-i-j dt-over-dy (- u-i-j u-i-j-1))
-                           (* dt-over-two-rho-dx (- p-j-i+1 p-j-i-1))
-                           (* -1.0 nu
-                              (+ (* dt-over-dx-square
-                                    (+ u-j-i+1 neg-two-u-i-j u-j-i-1))
-                                 (* dt-over-dy-square
-                                    (+ u-i-j+1 neg-two-u-i-j u-i-j-1)))))))
+             vn-prev-x  (aget vn y-prev-idx)
+             vn-x       (aget vn y-idx)
+             vn-next-x  (aget vn y-next-idx)
 
-              (aset array-v y-idx x-idx
-                (- v-i-j
-                   (* v-i-j dt-over-dx (- v-i-j v-j-i-1))
-                   (* u-i-j dt-over-dy (- v-i-j v-i-j-1))
-                   (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
-                   (* -1.0 nu
-                      (+ (* dt-over-dx-square
-                            (+ v-j-i+1 neg-two-v-i-j v-j-i-1))
-                         (* dt-over-dy-square
-                            (+ v-i-j+1 neg-two-v-i-j v-i-j-1)))))))))
+             p-prev-x   (aget array-p y-prev-idx)
+             p-x        (aget array-p y-idx)
+             p-next-x   (aget array-p y-next-idx)]
+        (dotimes [x-idx x-second-end-idx]
+          (let [x-prev-idx    x-idx
+                x-idx         (inc x-idx)
+                x-next-idx    (inc x-idx)
 
-        ;; boundary conditions
-        (dotimes [y-idx ny]
-          (aset array-u y-idx 0 0.0)
-          (aset array-u y-idx x-end-idx 0.0)
-          (aset array-v y-idx 0 0.0)
-          (aset array-v y-idx x-end-idx 0.0))
-        (dotimes [x-idx nx]
-          (aset array-u 0 x-idx 0.0)
-          (aset array-u y-end-idx x-idx 1.0) ;; set velocity on cavity lid equal to 1
-          (aset array-v 0 x-idx 0.0)
-          (aset array-v y-end-idx x-idx 0.0))
-        (recur (inc n))))))
+                u-i-j         (aget un-x x-idx)
+                u-i-j-1       (aget un-prev-x x-idx)
+                u-i-j+1       (aget un-next-x x-idx)
+                u-j-i-1       (aget un-x x-prev-idx)
+                u-j-i+1       (aget un-x x-next-idx)
+                neg-two-u-i-j (* -2.0 u-i-j)
+
+                v-i-j         (aget vn-x x-idx)
+                v-i-j-1       (aget vn-prev-x x-idx)
+                v-i-j+1       (aget vn-next-x x-idx)
+                v-j-i-1       (aget vn-x x-prev-idx)
+                v-j-i+1       (aget vn-x x-next-idx)
+                neg-two-v-i-j (* -2.0 v-i-j)
+
+                p-j-i+1       (aget p-x x-next-idx)
+                p-j-i-1       (aget p-x x-prev-idx)
+                p-i-j+1       (aget p-next-x x-idx)
+                p-i-j-1       (aget p-prev-x x-idx)]
+            (aset array-u y-idx x-idx
+              (double (- u-i-j
+                         (* u-i-j dt-over-dx (- u-i-j u-j-i-1))
+                         (* v-i-j dt-over-dy (- u-i-j u-i-j-1))
+                         (* dt-over-two-rho-dx (- p-j-i+1 p-j-i-1))
+                         (* (- nu)
+                            (+ (* dt-over-dx-square
+                                  (+ u-j-i+1 neg-two-u-i-j u-j-i-1))
+                               (* dt-over-dy-square
+                                  (+ u-i-j+1 neg-two-u-i-j u-i-j-1)))))))
+
+            (aset array-v y-idx x-idx
+              (double (- v-i-j
+                         (* u-i-j dt-over-dx (- v-i-j v-j-i-1))
+                         (* v-i-j dt-over-dy (- v-i-j v-i-j-1))
+                         (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
+                         (* (- nu)
+                            (+ (* dt-over-dx-square
+                                  (+ v-j-i+1 neg-two-v-i-j v-j-i-1))
+                               (* dt-over-dy-square
+                                  (+ v-i-j+1 neg-two-v-i-j v-i-j-1)))))))))))
+
+     ;; boundary conditions
+     (dotimes [y-idx ny]
+       (aset array-u y-idx 0 0.0)
+       (aset array-u y-idx x-end-idx 0.0)
+       (aset array-v y-idx 0 0.0)
+       (aset array-v y-idx x-end-idx 0.0))
+     (dotimes [x-idx nx]
+       (aset array-u 0 x-idx 0.0)
+       (aset array-u y-end-idx x-idx 1.0) ;; set velocity on cavity lid equal to 1
+       (aset array-v 0 x-idx 0.0)
+       (aset array-v y-end-idx x-idx 0.0))
+     (swap! !nt inc))))
 ;;
-;; nt = 100
+;; Run simulation with nt = 100
+(cavity-flow (assoc init-params :nt 100))
+;;
 ^:kindly/hide-code
-(two-d/plotly-contour-quiver-plot (cavity-flow (assoc init-params :nt 100)))
+(two-d/plotly-contour-quiver-plot init-params)
