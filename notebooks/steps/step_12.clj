@@ -375,8 +375,8 @@
 
                 (aset array-v y-idx x-idx
                   (double (- v-i-j
-                             (* v-i-j dt-over-dx (- v-i-j v-j-i-1))
-                             (* u-i-j dt-over-dy (- v-i-j v-i-j-1))
+                             (* u-i-j dt-over-dx (- v-i-j v-j-i-1))
+                             (* v-i-j dt-over-dy (- v-i-j v-i-j-1))
                              (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
                              (* (- nu)
                                 (+ (* dt-over-dx-square
@@ -481,5 +481,57 @@
 ;; You can see that we've also included `!step-count` to see how many iterations our loop
 ;; went through before our stop condition was met.
 ;;
-(two-d/plotly-quiver-plot init-params)
-
+^:kindly/hide-code
+(str @!step-count)
+;;
+;; If you want to see how the number of iteration increases as our `!u-diff` condition gets smaller,
+;; try defining a function to perform the `while` loop written above that takes an input `!`u-diff`
+;; and outputs the number of iterations that the function runs.
+;;
+;; For now, let's look at our results. We've used the quiver functions to look at the cavity flow results
+;; and it works well for channel flow too.
+(two-d/plotly-quiver-plot init-params :step 3 :scale 0.1)
+;;
+;; `:step 3` are useful when dealing with large amount of data that you want to visualize.
+;; The one used above tells `plotly` to only plot every 3rd data point. If we leave it out, you can see
+;; that the result can appear a little crowded since I set the default value `2` in the plotting function.
+;;
+;; ### Learn more
+;;
+;; **What is the meaning of the $F$ term?**
+;;
+;; Step 12 is an exercise demonstrating the problem of flow in a channel or pipe. If you recall from fluid mechanics
+;; class, a specified pressure gradient is what drives Poisseulle flow.
+;;
+;; Recall the $x$-momentum equation:
+(tex "\\frac{\\partial u}{\\partial t}+u \\cdot \\nabla u = -\\frac{\\partial p}{\\partial x}+\\nu \\nabla^2 u")
+;;
+;; What we actually do in Step 12 is split the pressure into steady and unsteady components $p=P+p'$.
+;; The applied steady pressure gradient is the constant $-\frac{\partial P}{\partial x}=F$(interpreted as a source term),
+;; and the unsteady component is $\frac{\partial p'}{\partial x}$. So the pressure that we solve for in Step 12 is
+;; actually $p'$, which for a steady flow is in fact equal to zero everywhere.
+;;
+;; **Why did we do this?**
+;;
+;; Note that we used periodic boundary conditions for this flow. For a flow with a constant pressure gradient,
+;; the value of pressure on the left edge of the domain must be different from the pressure at the right edge.
+;; So we cannot apply periodic boundary conditions on the pressure directly.
+;; It is easier to fix the gradient and solve the perturbations in pressure.
+;;
+;; **Shouldn't we always expect a uniform/constant $p'$ then?**
+;;
+;; That's true only in the case of steady laminar flows. At high Reynolds numbers, flows in channels can become
+;; turbulent, and we will see unsteady fluctuations in the pressure, which will result in non-zero values for $p'$.
+;;
+;; In step 12, note that the pressure field itself is not constant, but it's the pressure perturbation field is.
+;; The pressure field varies linearly along the channel with slope equal to the pressure gradient. Also, for
+;; incompressible flows, the absolute value of the pressure is inconsequential.
+;;
+;; **And explore more CFD materials online**
+;;
+;; The interactive module **12 steps to Navier-Stokes** is one of several components of the Computational Fluid Dynamics class
+;; taught by Prof. Lorena A. Barba in Boston University between 2009 and 2013.
+;;
+;; For a sample of what the other components of this class are, you can explore the **Resources** section of the Spring 2013
+;; version of [the course's Piazza site](https://piazza.com/bu/spring2013/me702/resources).
+;;

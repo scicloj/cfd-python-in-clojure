@@ -370,7 +370,7 @@
                 :annotations (make-plotly-quiver-annotations sim plot-params)}})))
 
 (defn plotly-quiver-plot
-  [{:keys [spatial-array array-p
+  [{:keys [spatial-array array-u
            x-start x-end y-start y-end] :as sim}
    & {:as plot-params'}]
   (let [[array-x array-y] spatial-array
@@ -378,7 +378,7 @@
         (merge plot-params-default plot-params')
         scatter-base {:x       array-x
                       :y       array-y
-                      :z       array-p
+                      :z       array-u
                       :mode    "markers"
                       :type    "scatter"
                       :marker  {:size marker-size}
