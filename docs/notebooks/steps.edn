@@ -21,4 +21,6 @@
  {:title "Step 10 - Poisson Equation"
   :src   "notebooks/steps/step_10.clj"}
  {:title "Step 11 - Cavity Flow with Navier-Stokes"
-  :src   "notebooks/steps/step_11.clj"}]
+  :src   "notebooks/steps/step_11.clj"}
+ {:title "Step 12 - Channel Flow with Navier-Stokes"
+  :src   "notebooks/steps/step_12.clj"}]

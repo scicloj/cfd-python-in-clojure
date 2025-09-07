@@ -1,0 +1,854 @@
+---
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    theme: [cosmo, notebooks/custom.scss]
+    output-file: steps.step_12.html
+code-block-background: true
+
+---
+<style></style><style>.printedClojure .sourceCode {
+  background-color: transparent;
+  border-style: none;
+}
+</style><style>.clay-limit-image-width .clay-image {max-width: 100%}
+.clay-side-by-side .sourceCode {margin: 0}
+.clay-side-by-side {margin: 1em 0}
+</style>
+<script src="steps.step_12_files/md-default0.js" type="text/javascript"></script><script src="steps.step_12_files/md-default1.js" type="text/javascript"></script><script src="steps.step_12_files/katex2.js" type="text/javascript"></script><script src="steps.step_12_files/plotly3.js" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
+Did you make it this far? This is the last step!
+How long did it take you to write your own Navier-stoke solver in Clojure
+following the interactive module? Let us know!
+
+
+## Step 12: Channel Flow with Navier-Stokes
+
+The only difference between this final step and Step 11 is that we are
+going to add a source term to the $u$-momentum equation, to mimic the effect
+of a pressure-driven channel flow. Here are our modified Navier-Stokes equations:
+
+
+$$\frac{\partial u}{\partial t}+u\frac{\partial u}{\partial x}+v\frac{\partial u}{\partial y}=-\frac{1}{\rho}\frac{\partial p}{\partial x}+\nu\left(\frac{\partial^2 u}{\partial x^2}+\frac{\partial^2 u}{\partial y^2}\right)+F$$
+
+$$\frac{\partial v}{\partial t}+u\frac{\partial v}{\partial x}+v\frac{\partial v}{\partial y}=-\frac{1}{\rho}\frac{\partial p}{\partial y}+\nu\left(\frac{\partial^2 v}{\partial x^2}+\frac{\partial^2 v}{\partial y^2}\right)$$
+
+$$\frac{\partial^2 p}{\partial x^2}+\frac{\partial^2 p}{\partial y^2}=-\rho\left(\frac{\partial u}{\partial x}\frac{\partial u}{\partial x}+2\frac{\partial u}{\partial y}\frac{\partial v}{\partial x}+\frac{\partial v}{\partial y}\frac{\partial v}{\partial y}\right)$$
+
+
+
+### Discretized equations
+
+With patience and care, we write the discretized form of the equations.
+It is highly recommended that you write these in your own hand, mentally
+following each term as you write it.
+
+The $u$-momentum equation:
+
+$$\begin{split}
+& \frac{u_{i,j}^{n+1}-u_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{u_{i,j}^{n}-u_{i,j-1}^{n}}{\Delta y} = \\
+& \qquad -\frac{1}{\rho}\frac{p_{i+1,j}^{n}-p_{i-1,j}^{n}}{2\Delta x} \\
+& \qquad +\nu\left(\frac{u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n}}{\Delta x^2}+\frac{u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n}}{\Delta y^2}\right)+F_{i,j}
+\end{split}$$
+
+
+The $v$-momentum equation:
+
+$$\begin{split}
+& \frac{v_{i,j}^{n+1}-v_{i,j}^{n}}{\Delta t}+u_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i-1,j}^{n}}{\Delta x}+v_{i,j}^{n}\frac{v_{i,j}^{n}-v_{i,j-1}^{n}}{\Delta y} = \\
+& \qquad -\frac{1}{\rho}\frac{p_{i,j+1}^{n}-p_{i,j-1}^{n}}{2\Delta y} \\
+& \qquad +\nu\left(\frac{v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n}}{\Delta x^2}+\frac{v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n}}{\Delta y^2}\right)
+\end{split}$$
+
+
+And the pressure equation:
+
+$$\begin{split}
+& \frac{p_{i+1,j}^{n}-2p_{i,j}^{n}+p_{i-1,j}^{n}}{\Delta x^2} + \frac{p_{i,j+1}^{n}-2p_{i,j}^{n}+p_{i,j-1}^{n}}{\Delta y^2} = \\
+& \qquad \rho\left[\frac{1}{\Delta t}\left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}+\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right) - \frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x} - 2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x} - \frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right]
+\end{split}$$
+
+
+As always, we need to re-arrange these equations to the form we need in the code
+to make the iterations proceed.
+
+For the $u$ and $v$ momentum equations, we isolate the velocity at the time step `n+1`:
+
+$$\begin{split}
+u_{i,j}^{n+1} = u_{i,j}^{n} & - u_{i,j}^{n} \frac{\Delta t}{\Delta x} \left(u_{i,j}^{n}-u_{i-1,j}^{n}\right) - v_{i,j}^{n} \frac{\Delta t}{\Delta y} \left(u_{i,j}^{n}-u_{i,j-1}^{n}\right) \\
+& - \frac{\Delta t}{\rho 2\Delta x} \left(p_{i+1,j}^{n}-p_{i-1,j}^{n}\right) \\
+& + \nu\left[\frac{\Delta t}{\Delta x^2} \left(u_{i+1,j}^{n}-2u_{i,j}^{n}+u_{i-1,j}^{n}\right) + \frac{\Delta t}{\Delta y^2} \left(u_{i,j+1}^{n}-2u_{i,j}^{n}+u_{i,j-1}^{n}\right)\right] \\
+& + \Delta t F
+\end{split}$$
+
+$$\begin{split}
+v_{i,j}^{n+1} = v_{i,j}^{n} & - u_{i,j}^{n} \frac{\Delta t}{\Delta x} \left(v_{i,j}^{n}-v_{i-1,j}^{n}\right) - v_{i,j}^{n} \frac{\Delta t}{\Delta y} \left(v_{i,j}^{n}-v_{i,j-1}^{n}\right) \\
+& - \frac{\Delta t}{\rho 2\Delta y} \left(p_{i,j+1}^{n}-p_{i,j-1}^{n}\right) \\
+& + \nu\left[\frac{\Delta t}{\Delta x^2} \left(v_{i+1,j}^{n}-2v_{i,j}^{n}+v_{i-1,j}^{n}\right) + \frac{\Delta t}{\Delta y^2} \left(v_{i,j+1}^{n}-2v_{i,j}^{n}+v_{i,j-1}^{n}\right)\right]
+\end{split}$$
+
+
+And for the pressure equation, we isolate the term $p_{i,j}^n$ to iterate in pseudo-time:
+
+$$\begin{split}
+p_{i,j}^{n} = & \frac{\left(p_{i+1,j}^{n}+p_{i-1,j}^{n}\right) \Delta y^2 + \left(p_{i,j+1}^{n}+p_{i,j-1}^{n}\right) \Delta x^2}{2(\Delta x^2+\Delta y^2)} \\
+& -\frac{\rho\Delta x^2\Delta y^2}{2\left(\Delta x^2+\Delta y^2\right)} \\
+& \times \left[\frac{1}{\Delta t} \left(\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x} + \frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right) - \frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x}\frac{u_{i+1,j}-u_{i-1,j}}{2\Delta x} - 2\frac{u_{i,j+1}-u_{i,j-1}}{2\Delta y}\frac{v_{i+1,j}-v_{i-1,j}}{2\Delta x} - \frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\frac{v_{i,j+1}-v_{i,j-1}}{2\Delta y}\right]
+\end{split}$$
+
+
+The initial condition is $u, v, p = 0$ everywhere, and at the boundary conditions are:
+$u, v, p$ are periodic on $x = 0, 2$ <br>
+$u, v = 0$ at $y = 0, 2$ <br>
+$\frac{\partial p}{\partial y} = 0$ at $y = 0, 2$ <br>
+$F = 1$ everywhere
+
+In step 11, we isolated a portion of our transposed equation to make it easier to parse
+and we're going to do the same thing here. One thing to note is that we have periodic
+boundary conditions throughout this grid, so we need to explicitly calculate the values
+at the leading and trailing edge of our `u` vector.
+
+
+
+::: {.sourceClojure}
+```clojure
+(defn build-up-b [{:keys [array-b array-u array-v rho dt dx dy nx ny
+                          x-end-idx y-end-idx
+                          x-second-end-idx y-second-end-idx
+                          two-dx
+                          two-dy
+                          two-dx-dy
+                          four-dx-square
+                          four-dy-square] :as _params}]
+  (dotimes [y-idx y-second-end-idx]
+    (let [y-prev-idx                 y-idx
+          y-idx                      (inc y-idx)
+          y-next-idx                 (inc y-idx)
+
+          u-prev-x                   (aget array-u y-prev-idx)
+          u-x                        (aget array-u y-idx)
+          u-next-x                   (aget array-u y-next-idx)
+          v-prev-x                   (aget array-v y-prev-idx)
+          v-x                        (aget array-v y-idx)
+          v-next-x                   (aget array-v y-next-idx)
+
+          u-x-start                  (aget u-x 0)
+          u-x-2nd                    (aget u-x 1)
+          u-x-2nd-end                (aget u-x x-second-end-idx)
+          u-x-end                    (aget u-x x-end-idx)
+          u-next-x-start             (aget u-next-x 0)
+          u-prev-x-start             (aget u-prev-x 0)
+          u-next-x-end               (aget u-next-x x-end-idx)
+          u-prev-x-end               (aget u-prev-x x-end-idx)
+
+          v-x-start                  (aget v-x 0)
+          v-x-2nd                    (aget v-x 1)
+          v-x-2nd-end                (aget v-x x-second-end-idx)
+          v-x-end                    (aget v-x x-end-idx)
+          v-next-x-start             (aget v-next-x 0)
+          v-prev-x-start             (aget v-prev-x 0)
+          v-next-x-end               (aget v-next-x x-end-idx)
+          v-prev-x-end               (aget v-prev-x x-end-idx)
+
+          u-x-start-end-diff         (- u-x-start u-x-2nd-end)
+          u-x-start-end-diff-sqr     (* u-x-start-end-diff u-x-start-end-diff)
+
+          v-next-prev-end-diff       (- v-next-x-end v-prev-x-end)
+          v-next-prev-end-diff-sqr   (* v-next-prev-end-diff v-next-prev-end-diff)
+
+          u-x-2nd-end-diff           (- u-x-2nd u-x-end)
+          u-x-2nd-end-diff-sqr       (* u-x-2nd-end-diff u-x-2nd-end-diff)
+
+          v-next-prev-start-diff     (- v-next-x-start v-prev-x-start)
+          v-next-prev-start-diff-sqr (* v-next-prev-start-diff v-next-prev-start-diff)]
+      (dotimes [x-idx x-second-end-idx]
+        (let [;; index definitions
+              x-prev-idx x-idx
+              x-idx      (inc x-idx)
+              x-next-idx (inc x-idx)
+
+              ;; extracting array values
+              u-i-j-1    (aget u-prev-x x-idx)
+              u-i-j+1    (aget u-next-x x-idx)
+              u-j-i-1    (aget u-x x-prev-idx)
+              u-j-i+1    (aget u-x x-next-idx)
+
+              v-i-j-1    (aget v-prev-x x-idx)
+              v-i-j+1    (aget v-next-x x-idx)
+              v-j-i-1    (aget v-x x-prev-idx)
+              v-j-i+1    (aget v-x x-next-idx)
+
+              ;; pre-calculations
+              u-i-diff   (- u-j-i+1 u-j-i-1)
+              u-j-diff   (- u-i-j+1 u-i-j-1)
+              v-i-diff   (- v-j-i+1 v-j-i-1)
+              v-j-diff   (- v-i-j+1 v-i-j-1)]
+          (aset array-b y-idx x-idx
+            (double (* rho
+                       (- (/ (+ (/ u-i-diff two-dx) (/ v-j-diff two-dy)) dt)
+                          (/ (* u-i-diff u-i-diff) four-dx-square)
+                          (/ (* u-j-diff v-i-diff) two-dx-dy)
+                          (/ (* v-j-diff v-j-diff) four-dy-square)))))))
+
+      ;; Periodic BC Pressure @ x = 2
+      (aset array-b y-idx x-end-idx
+        (double (* rho
+                   (- (/ (+ (/ u-x-start-end-diff two-dx)
+                            (/ v-next-prev-end-diff two-dy))
+                         dt)
+                      (/ u-x-start-end-diff-sqr four-dx-square)
+                      (/ (* (- u-next-x-end u-prev-x-end) (- v-x-start v-x-2nd-end)) two-dx-dy)
+                      (/ v-next-prev-end-diff-sqr four-dy-square)))))
+
+      ;; Periodic BC Pressure @ x = 0
+      (aset array-b y-idx 0
+        (double (* rho
+                   (- (/ (+ (/ u-x-2nd-end-diff two-dx)
+                            (/ v-next-prev-start-diff two-dy))
+                         dt)
+                      (/ u-x-2nd-end-diff-sqr four-dx-square)
+                      (/ (* (- u-next-x-start u-prev-x-start) (- v-x-2nd v-x-end)) two-dx-dy)
+                      (/ v-next-prev-start-diff-sqr four-dy-square))))))))
+```
+:::
+
+
+
+We'll also define a Pressure Poisson iterative function, again like we did in Step 11.
+Once more, note that we have to include the periodic boundary conditions at the leading and
+trailing edge.
+We also have to specify the boundary conditions at the top and bottom of our grid.
+
+
+
+::: {.sourceClojure}
+```clojure
+(defn pressure-poisson-periodic [{:keys [array-p array-b nx ny dx dy nit
+                                         x-end-idx y-end-idx
+                                         x-second-end-idx y-second-end-idx
+                                         dx-square
+                                         dy-square
+                                         two-dx-dy-squares-sum
+                                         dx-dy-squares-over-two-dx-dy-squares-sum]
+                                  :as   _params}]
+  (dotimes [_ nit]
+    (let [pn (two-d/clone-2d-array array-p)]
+      (dotimes [y-idx y-second-end-idx]
+        (let [y-prev-idx y-idx
+              y-idx      (inc y-idx)
+              y-next-idx (inc y-idx)
+
+              pn-x       (aget pn y-idx)
+              pn-prev-x  (aget pn y-prev-idx)
+              pn-next-x  (aget pn y-next-idx)
+              array-b-x  (aget array-b y-idx)]
+          (dotimes [x-idx x-second-end-idx]
+            (let [x-prev-idx   x-idx
+                  x-idx        (inc x-idx)
+                  x-next-idx   (inc x-idx)
+
+                  p-i-j-1      (aget pn-prev-x x-idx)
+                  p-i-j+1      (aget pn-next-x x-idx)
+                  p-j-i-1      (aget pn-x x-prev-idx)
+                  p-j-i+1      (aget pn-x x-next-idx)
+                  p-i-diff-sum (+ p-j-i+1 p-j-i-1)
+                  p-j-diff-sum (+ p-i-j+1 p-i-j-1)]
+              (aset array-p y-idx x-idx
+                (double (- (/ (+ (* p-i-diff-sum dy-square)
+                                 (* p-j-diff-sum dx-square))
+                              two-dx-dy-squares-sum)
+                           (* dx-dy-squares-over-two-dx-dy-squares-sum
+                              (aget array-b-x x-idx)))))))
+
+          ;; Periodic BC Pressure @ x = 2
+          (aset array-p y-idx x-end-idx
+            (double (- (/ (+ (* (+ (aget pn-x 0) (aget pn-x x-second-end-idx)) dy-square)
+                             (* (+ (aget pn-next-x x-end-idx) (aget pn-prev-x x-end-idx)) dx-square))
+                          two-dx-dy-squares-sum)
+                       (* dx-dy-squares-over-two-dx-dy-squares-sum
+                          (aget array-b-x x-end-idx)))))
+
+          ;; Periodic BC Pressure @ x = 0
+          (aset array-p y-idx 0
+            (double (- (/ (+ (* (+ (aget pn-x 1) (aget pn-x x-end-idx)) dy-square)
+                             (* (+ (aget pn-next-x 0) (aget pn-prev-x 0)) dx-square))
+                          two-dx-dy-squares-sum)
+                       (* dx-dy-squares-over-two-dx-dy-squares-sum
+                          (aget array-b-x 0)))))))
+
+      ;; Wall boundary conditions, pressure
+      (aset array-p y-end-idx (aget array-p y-second-end-idx))
+      (aset array-p 0 (aget array-p 1)))))
+```
+:::
+
+
+
+Now we have our familiar list of variables and initial conditions to declare before we start.
+
+
+### Variable Declarations
+
+**Spatial setup:**
+
+
+::: {.sourceClojure}
+```clojure
+(def nx 41)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def ny 41)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def nt 10)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def nit 50)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def c 1)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def x-start 0)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def x-end 2)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def y-start 0)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def y-end 2)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def dx (double (/ (- x-end x-start) (dec nx))))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def dy (double (/ (- y-end y-start) (dec ny))))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def spatial-init-params
+  {:nx nx :x-start x-start :x-end x-end :dx dx :x-end-idx (dec nx) :x-second-end-idx (- nx 2)
+   :ny ny :y-start y-start :y-end y-end :dy dy :y-end-idx (dec ny) :y-second-end-idx (- ny 2)})
+```
+:::
+
+
+
+
+
+::: {.sourceClojure}
+```clojure
+(def spatial-array (two-d/create-array-2d spatial-init-params))
+```
+:::
+
+
+
+**The rest setup:**
+
+
+::: {.sourceClojure}
+```clojure
+(def rho 1.0)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def nu 1e-1)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def F 1.0)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def dt 1e-2)
+```
+:::
+
+
+
+Doing some pre-calculation to optimize the performance
+
+
+::: {.sourceClojure}
+```clojure
+(def pre-calculation-params
+  {:two-dx                (* 2.0 dx)
+   :two-dy                (* 2.0 dy)
+   :two-dx-dy             (* 2.0 dx dy)
+   :dx-square             (pow dx 2)
+   :dy-square             (pow dy 2)
+   :four-dx-square        (* 4.0 (pow dx 2))
+   :four-dy-square        (* 4.0 (pow dy 2))
+   :dx-dy-squares         (* (pow dx 2) (pow dy 2))
+   :dx-dy                 (* dx dy)
+   :over-dx               (/ 1.0 dx)
+   :over-dy               (/ 1.0 dy)
+   :dt-over-dx            (/ dt dx)
+   :dt-over-dy            (/ dt dy)
+   :dt-over-dx-square     (/ dt (pow dx 2))
+   :dt-over-dy-square     (/ dt (pow dy 2))
+   :two-dx-dy-squares-sum (* 2.0 (+ (pow dx 2) (pow dy 2)))
+   :dx-dy-squares-over-two-dx-dy-squares-sum
+   (/ (* (pow dx 2) (pow dy 2)) (* 2.0 (+ (pow dx 2) (pow dy 2))))
+   :dt-over-two-rho-dx    (/ dt (* 2.0 rho dx))
+   :dt-over-two-rho-dy    (/ dt (* 2.0 rho dy))
+   :dt-F                  (* dt F)})
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-u (two-d/create-init-zeros-u (assoc spatial-init-params :d-type Double/TYPE) spatial-array))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-v (two-d/clone-2d-array array-u))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-p (two-d/clone-2d-array array-u))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def array-b (two-d/clone-2d-array array-u))
+```
+:::
+
+
+
+Now we define initial parameters:
+
+
+::: {.sourceClojure}
+```clojure
+(def init-params
+  (-> (merge spatial-init-params pre-calculation-params)
+      (assoc :rho rho
+             :nu nu
+             :dt dt
+             :nit nit
+             :nt nt
+             :F F
+             :spatial-array spatial-array
+             :array-u array-u
+             :array-v array-v
+             :array-p array-p
+             :array-b array-b)))
+```
+:::
+
+
+
+For the meat of our computation, we're going to reach back to a trick we used in Step 9
+for Laplace's Equation. We're interested in what our grid will look like once we've
+reached a near-steady state. We can either specify a number of timesteps `nt` and
+increment it until we're satisfied with the results, or we can tell our code to run until the
+difference between two consecutive iterations is very small.
+
+We also have to manage **8** separate boundary conditions for each iteration. The code
+below writes each of them out explicitly. If you're interested in a challenge, you can try
+to write a function which can handle some or all these boundary conditions.
+At the moment, I am just trying to make the simulation running, so - todo: refactor it to be better
+
+
+
+::: {.sourceClojure}
+```clojure
+(def default-u-diff 1.0)
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def !step-count (atom 0))
+```
+:::
+
+
+
+::: {.sourceClojure}
+```clojure
+(def !u-diff (atom default-u-diff))
+```
+:::
+
+
+
+
+
+::: {.sourceClojure}
+```clojure
+(defn cavity-flow-periodic [{:keys [nt array-u array-v array-p dt nx ny dx dy rho nu
+                                    x-end-idx y-end-idx
+                                    x-second-end-idx y-second-end-idx
+                                    dt-over-dx
+                                    dt-over-dy
+                                    dt-over-dx-square
+                                    dt-over-dy-square
+                                    two-dx-dy-squares-sum
+                                    dt-over-two-rho-dx
+                                    dt-over-two-rho-dy
+                                    dt-F]
+                             :as   params}]
+  (let [neg-dt-F (- dt-F)]
+    (while (> @!u-diff 1e-3)
+      (let [un (two-d/clone-2d-array array-u)
+            vn (two-d/clone-2d-array array-v)]
+        (build-up-b params)
+        (pressure-poisson-periodic params)
+        (dotimes [y-idx y-second-end-idx]
+          (let [y-prev-idx y-idx
+                y-idx      (inc y-idx)
+                y-next-idx (inc y-idx)
+
+                un-prev-x  (aget un y-prev-idx)
+                un-x       (aget un y-idx)
+                un-next-x  (aget un y-next-idx)
+
+                vn-prev-x  (aget vn y-prev-idx)
+                vn-x       (aget vn y-idx)
+                vn-next-x  (aget vn y-next-idx)
+
+                p-prev-x   (aget array-p y-prev-idx)
+                p-x        (aget array-p y-idx)
+                p-next-x   (aget array-p y-next-idx)]
+            (dotimes [x-idx x-second-end-idx]
+              (let [x-prev-idx    x-idx
+                    x-idx         (inc x-idx)
+                    x-next-idx    (inc x-idx)
+
+                    u-i-j         (aget un-x x-idx)
+                    u-i-j-1       (aget un-prev-x x-idx)
+                    u-i-j+1       (aget un-next-x x-idx)
+                    u-j-i-1       (aget un-x x-prev-idx)
+                    u-j-i+1       (aget un-x x-next-idx)
+                    neg-two-u-i-j (* -2.0 u-i-j)
+
+                    v-i-j         (aget vn-x x-idx)
+                    v-i-j-1       (aget vn-prev-x x-idx)
+                    v-i-j+1       (aget vn-next-x x-idx)
+                    v-j-i-1       (aget vn-x x-prev-idx)
+                    v-j-i+1       (aget vn-x x-next-idx)
+                    neg-two-v-i-j (* -2.0 v-i-j)
+
+                    p-j-i+1       (aget p-x x-next-idx)
+                    p-j-i-1       (aget p-x x-prev-idx)
+                    p-i-j+1       (aget p-next-x x-idx)
+                    p-i-j-1       (aget p-prev-x x-idx)]
+                (aset array-u y-idx x-idx
+                  (double (- u-i-j
+                             (* u-i-j dt-over-dx (- u-i-j u-j-i-1))
+                             (* v-i-j dt-over-dy (- u-i-j u-i-j-1))
+                             (* dt-over-two-rho-dx (- p-j-i+1 p-j-i-1))
+                             (* (- nu)
+                                (+ (* dt-over-dx-square
+                                      (+ u-j-i+1 neg-two-u-i-j u-j-i-1))
+                                   (* dt-over-dy-square
+                                      (+ u-i-j+1 neg-two-u-i-j u-i-j-1))))
+                             neg-dt-F)))
+
+                (aset array-v y-idx x-idx
+                  (double (- v-i-j
+                             (* u-i-j dt-over-dx (- v-i-j v-j-i-1))
+                             (* v-i-j dt-over-dy (- v-i-j v-i-j-1))
+                             (* dt-over-two-rho-dy (- p-i-j+1 p-i-j-1))
+                             (* (- nu)
+                                (+ (* dt-over-dx-square
+                                      (+ v-j-i+1 neg-two-v-i-j v-j-i-1))
+                                   (* dt-over-dy-square
+                                      (+ v-i-j+1 neg-two-v-i-j v-i-j-1)))))))))
+
+            ;; Boundary conditions
+            (let [un-x-end        (aget un-x x-end-idx)
+                  un-x-2nd-end    (aget un-x x-second-end-idx)
+                  un-x-start      (aget un-x 0)
+                  un-x-2nd        (aget un-x 1)
+                  un-prev-x-start (aget un-prev-x 0)
+                  un-prev-x-end   (aget un-prev-x x-end-idx)
+                  un-next-x-end   (aget un-next-x x-end-idx)
+                  un-next-x-start (aget un-next-x 0)
+
+                  vn-x-end        (aget vn-x x-end-idx)
+                  vn-x-2nd-end    (aget vn-x x-second-end-idx)
+                  vn-x-start      (aget vn-x 0)
+                  vn-x-2nd        (aget vn-x 1)
+                  vn-prev-x-start (aget vn-prev-x 0)
+                  vn-prev-x-end   (aget vn-prev-x x-end-idx)
+                  vn-next-x-end   (aget vn-next-x x-end-idx)
+                  vn-next-x-start (aget vn-next-x 0)
+
+                  p-x-start       (aget p-x 0)
+                  p-x-2nd         (aget p-x 1)
+                  p-x-end         (aget p-x x-end-idx)
+                  p-x-2nd-end     (aget p-x x-second-end-idx)
+                  p-next-x-start  (aget p-next-x 0)
+                  p-next-x-end    (aget p-next-x x-end-idx)
+                  p-prev-x-start  (aget p-prev-x 0)
+                  p-prev-x-end    (aget p-prev-x x-end-idx)]
+
+              ;; Periodic BC u @ x = 2
+              (aset array-u y-idx x-end-idx
+                (double (- un-x-end
+                           (* un-x-end dt-over-dx (- un-x-end un-x-2nd-end))
+                           (* vn-x-end dt-over-dy (- un-x-end un-prev-x-end))
+                           (* dt-over-two-rho-dx (- p-x-start p-x-2nd-end))
+                           (* (- nu)
+                              (+ (* dt-over-dx-square
+                                    (+ un-x-start (* -2.0 un-x-end) un-x-2nd-end))
+                                 (* dt-over-dy-square
+                                    (+ un-next-x-end (* -2.0 un-x-end) un-prev-x-end))))
+                           neg-dt-F)))
+
+              ;; Periodic BC u @ x = 0
+              (aset array-u y-idx 0
+                (double (- un-x-start
+                           (* un-x-start dt-over-dx (- un-x-start un-x-end))
+                           (* vn-x-start dt-over-dy (- un-x-start un-prev-x-start))
+                           (* dt-over-two-rho-dx (- p-x-2nd p-x-end))
+                           (* (- nu)
+                              (+ (* dt-over-dx-square
+                                    (+ un-x-2nd (* -2.0 un-x-start) un-x-end))
+                                 (* dt-over-dy-square
+                                    (+ un-next-x-start (* -2.0 un-x-start) un-prev-x-start))))
+                           neg-dt-F)))
+
+              ;; Periodic BC v @ x = 2
+              (aset array-v y-idx x-end-idx
+                (double (- vn-x-end
+                           (* un-x-end dt-over-dx (- vn-x-end vn-x-2nd-end))
+                           (* vn-x-end dt-over-dy (- vn-x-end vn-prev-x-end))
+                           (* dt-over-two-rho-dy (- p-next-x-end p-prev-x-end))
+                           (* (- nu)
+                              (+ (* dt-over-dx-square
+                                    (+ vn-x-start (* -2.0 vn-x-end) vn-x-2nd-end))
+                                 (* dt-over-dy-square
+                                    (+ vn-next-x-end (* -2.0 vn-x-end) vn-prev-x-end)))))))
+
+              ;; Periodic BC v @ x = 0
+              (aset array-v y-idx 0
+                (double (- vn-x-start
+                           (* un-x-start dt-over-dx (- vn-x-start vn-x-end))
+                           (* vn-x-start dt-over-dy (- vn-x-start vn-prev-x-start))
+                           (* dt-over-two-rho-dy (- p-next-x-start p-prev-x-start))
+                           (* (- nu)
+                              (+ (* dt-over-dx-square
+                                    (+ vn-x-2nd (* -2.0 vn-x-start) vn-x-end))
+                                 (* dt-over-dy-square
+                                    (+ vn-next-x-start (* -2.0 vn-x-start) vn-prev-x-start))))))))))
+
+        ;; Wall boundary conditions: u,v = 0 @ y = 0, 2
+        (dotimes [x-idx nx]
+          (aset array-u 0 x-idx 0.0)
+          (aset array-u y-end-idx x-idx 0.0)
+          (aset array-v 0 x-idx 0.0)
+          (aset array-v y-end-idx x-idx 0.0))
+
+        (let [sum-u  (reduce + 0.0 (mapcat identity array-u))
+              sum-un (reduce + 0.0 (mapcat identity un))
+              u-diff (if (zero? sum-u) 0.0 (/ (- sum-u sum-un) sum-u))]
+          (reset! !u-diff u-diff))
+        (swap! !step-count inc)))))
+```
+:::
+
+
+
+Run the simulation
+
+
+::: {.sourceClojure}
+```clojure
+(cavity-flow-periodic init-params)
+```
+:::
+
+
+
+::: {.printedClojure}
+```clojure
+nil
+
+```
+:::
+
+
+
+You can see that we've also included `!step-count` to see how many iterations our loop
+went through before our stop condition was met.
+
+
+
+::: {.printedClojure}
+```clojure
+"499"
+
+```
+:::
+
+
+
+If you want to see how the number of iteration increases as our `!u-diff` condition gets smaller,
+try defining a function to perform the `while` loop written above that takes an input `!`u-diff`
+and outputs the number of iterations that the function runs.
+
+For now, let's look at our results. We've used the quiver functions to look at the cavity flow results
+and it works well for channel flow too.
+
+
+::: {.sourceClojure}
+```clojure
+(two-d/plotly-quiver-plot init-params :step 3 :scale 0.1)
+```
+:::
+
+
+
+```{=html}
+<div style="height:auto;width:100%;"><script>Plotly.newPlot(document.currentScript.parentElement,
+               [{"x":[0.0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75,1.8,1.85,1.9,1.95,2.0],"y":[0.0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.9,0.95,1.0,1.05,1.1,1.15,1.2,1.25,1.3,1.35,1.4,1.45,1.5,1.55,1.6,1.65,1.7,1.75,1.8,1.85,1.9,1.95,2.0],"z":[[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],[0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341,0.3694100596363341],[0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664,0.7145482143964664],[1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877,1.0361380687219877],[1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425,1.334894273472425],[1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506,1.611518118413506],[1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309,1.8666932073475309],[2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994],[2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698],[2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464],[2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179],[2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497],[2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781],[3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924],[3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463],[3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054],[3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536],[3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666],[3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385],[3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954],[3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711,3.494896156028711],[3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954,3.4870358216819954],[3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385,3.4634262172734385],[3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666,3.4239817148295666],[3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536,3.368560187092536],[3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054,3.296963882812054],[3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463,3.2089406446656463],[3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924,3.10418546236924],[2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781,2.982342351486781],[2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497,2.8430065464482497],[2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179,2.68572699435179],[2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464,2.5100091342694464],[2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698,2.3153179450087698],[2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994,2.1010812426155994],[1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531,1.866693207347531],[1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061,1.6115181184135061],[1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252,1.3348942734724252],[1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988,1.036138068721988],[0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665,0.7145482143964665],[0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342,0.3694100596363342],[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]],"mode":"markers","type":"scatter","marker":{"size":1},"opacity":0.5}], {"title":null,"xaxis":{"title":"X","range":[0,2]},"yaxis":{"title":"Y","range":[0,2]},"width":600,"height":400,"annotations":[{"y":0.0,"yref":"y","ax":0.0,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.0,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.15,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.15000000596046448,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.3,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.30000001192092896,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.45,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.44999998807907104,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.6,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.6000000238418579,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.75,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.75,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":0.9,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":0.8999999761581421,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.05,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.0499999523162842,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.2,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.2000000476837158,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.35,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.350000023841858,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.5,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.5,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.65,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.649999976158142,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.0,"yref":"y","ax":1.8,"ay":0.0,"xref":"x","axref":"x","arrowcolor":"rgb(0, 255, 100)","opacity":0.5,"arrowhead":2,"x":1.7999999523162842,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.0,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.10361380687219877,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.15,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.25361381283266327,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.3,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.40361381879312774,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.45,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.5536137949512698,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.6,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.7036138307140567,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.75,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":0.8536138068721988,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":0.9,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.0036137830303409,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.05,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.153613759188483,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.2,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.3036138545559146,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.35,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.4536138307140567,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.5,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.6036138068721988,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.65,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.7536137830303409,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.15000000596046448,"yref":"y","ax":1.8,"ay":0.15,"xref":"x","axref":"x","arrowcolor":"rgb(5, 249, 100)","opacity":0.5,"arrowhead":2,"x":1.903613759188483,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.0,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.1866693207347531,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.15,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.33666932669521754,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.3,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.486669332655682,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.45,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.6366693088138241,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.6,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.786669344576611,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.75,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":0.9366693207347531,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":0.9,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.0866692968928953,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.05,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.2366692730510374,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.2,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.386669368418469,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.35,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.536669344576611,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.5,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.6866693207347532,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.65,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.8366692968928953,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.30000001192092896,"yref":"y","ax":1.8,"ay":0.3,"xref":"x","axref":"x","arrowcolor":"rgb(9, 245, 100)","opacity":0.5,"arrowhead":2,"x":1.9866692730510374,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.0,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":0.25100091342694464,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.15,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":0.4010009193874091,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.3,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":0.5510009253478736,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.45,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":0.7010009015060157,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.6,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":0.8510009372688025,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.75,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.0010009134269446,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":0.9,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.1510008895850867,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.05,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.3010008657432288,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.2,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.4510009611106605,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.35,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.6010009372688025,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.5,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.7510009134269446,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.65,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":1.9010008895850867,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.44999998807907104,"yref":"y","ax":1.8,"ay":0.45,"xref":"x","axref":"x","arrowcolor":"rgb(12, 242, 100)","opacity":0.5,"arrowhead":2,"x":2.051000865743229,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.0,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":0.29823423514867814,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.15,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":0.4482342411091426,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.3,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":0.5982342470696072,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.45,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":0.7482342232277492,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.6,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":0.8982342589905361,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.75,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.0482342351486782,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":0.9,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.1982342113068203,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.05,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.3482341874649624,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.2,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.498234282832394,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.35,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.648234258990536,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.5,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.7982342351486782,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.65,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":1.9482342113068203,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.6000000238418579,"yref":"y","ax":1.8,"ay":0.6,"xref":"x","axref":"x","arrowcolor":"rgb(14, 240, 100)","opacity":0.5,"arrowhead":2,"x":2.0982341874649624,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.0,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.3296963882812054,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.15,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.4796963942416699,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.3,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.6296964002021344,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.45,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.7796963763602764,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.6,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.9296964121230633,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.75,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.0796963882812054,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":0.9,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.2296963644393475,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.05,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.3796963405974896,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.2,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.5296964359649212,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.35,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.6796964121230633,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.5,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.8296963882812054,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.65,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.9796963644393475,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.75,"yref":"y","ax":1.8,"ay":0.75,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":2.12969634059749,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.0,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.34634262172734387,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.15,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.49634262768780835,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.3,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.6463426336482728,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.45,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.7963426098064149,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.6,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.9463426455692018,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.75,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.0963426217273438,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":0.9,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.2463425978854858,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.05,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.396342574043628,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.2,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.5463426694110596,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.35,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.6963426455692017,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.5,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.8463426217273438,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.65,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.9963425978854858,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":0.8999999761581421,"yref":"y","ax":1.8,"ay":0.9,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":2.146342574043628,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.0,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.3487035821681996,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.15,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.49870358812866405,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.3,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.6487035940891286,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.45,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.7987035702472707,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.6,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":0.9487036060100575,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.75,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.0987035821681996,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":0.9,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.2487035583263417,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.05,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.3987035344844838,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.2,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.5487036298519155,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.35,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.6987036060100575,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.5,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.8487035821681996,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.65,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":1.9987035583263417,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.0499999523162842,"yref":"y","ax":1.8,"ay":1.05,"xref":"x","axref":"x","arrowcolor":"rgb(17, 237, 100)","opacity":0.5,"arrowhead":2,"x":2.1487035344844836,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.0,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.33685601870925364,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.15,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.4868560246697181,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.3,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.6368560306301826,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.45,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.7868560067883247,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.6,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":0.9368560425511115,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.75,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.0868560187092537,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":0.9,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.2368559948673958,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.05,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.386855971025538,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.2,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.5368560663929696,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.35,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.6868560425511117,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.5,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.8368560187092537,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.65,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":1.9868559948673958,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.2000000476837158,"yref":"y","ax":1.8,"ay":1.2,"xref":"x","axref":"x","arrowcolor":"rgb(16, 238, 100)","opacity":0.5,"arrowhead":2,"x":2.136855971025538,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.0,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":0.310418546236924,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.15,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":0.4604185521973885,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.3,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":0.610418558157853,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.45,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":0.760418534315995,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.6,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":0.9104185700787819,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.75,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.060418546236924,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":0.9,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.210418522395066,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.05,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.3604184985532082,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.2,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.5104185939206398,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.35,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.660418570078782,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.5,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.810418546236924,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.65,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":1.960418522395066,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.350000023841858,"yref":"y","ax":1.8,"ay":1.35,"xref":"x","axref":"x","arrowcolor":"rgb(15, 239, 100)","opacity":0.5,"arrowhead":2,"x":2.110418498553208,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.0,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":0.26857269943517903,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.15,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":0.4185727053956435,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.3,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":0.568572711356108,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.45,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":0.7185726875142501,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.6,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":0.8685727232770369,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.75,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.018572699435179,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":0.9,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.168572675593321,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.05,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.318572651751463,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.2,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.4685727471188947,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.35,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.6185727232770368,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.5,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.768572699435179,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.65,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":1.918572675593321,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.5,"yref":"y","ax":1.8,"ay":1.5,"xref":"x","axref":"x","arrowcolor":"rgb(13, 241, 100)","opacity":0.5,"arrowhead":2,"x":2.068572651751463,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.0,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.21010812426155995,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.15,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.3601081302220244,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.3,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.5101081361824888,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.45,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.6601081123406309,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.6,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.8101081481034178,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.75,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":0.9601081242615599,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":0.9,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.110108100419702,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.05,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.260108076577844,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.2,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.4101081719452757,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.35,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.5601081481034178,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.5,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.71010812426156,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.65,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":1.860108100419702,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.649999976158142,"yref":"y","ax":1.8,"ay":1.65,"xref":"x","axref":"x","arrowcolor":"rgb(10, 244, 100)","opacity":0.5,"arrowhead":2,"x":2.0101080765778443,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.0,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.13348942734724253,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.15,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.28348943330770704,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.3,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.4334894392681715,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.45,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.5834894154263136,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.6,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.7334894511891005,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.75,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":0.8834894273472426,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":0.9,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.0334894035053845,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.05,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.1834893796635266,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.2,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.3334894750309583,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.35,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.4834894511891004,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.5,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.6334894273472425,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.65,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.7834894035053845,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5},{"y":1.7999999523162842,"yref":"y","ax":1.8,"ay":1.8,"xref":"x","axref":"x","arrowcolor":"rgb(6, 248, 100)","opacity":0.5,"arrowhead":2,"x":1.9334893796635266,"ayref":"y","showarrow":true,"arrowsize":1,"arrowwidth":1.5}]}, {});</script></div>
+```
+
+
+
+`:step 3` are useful when dealing with large amount of data that you want to visualize.
+The one used above tells `plotly` to only plot every 3rd data point. If we leave it out, you can see
+that the result can appear a little crowded since I set the default value `2` in the plotting function.
+
+
+### Learn more
+
+**What is the meaning of the $F$ term?**
+
+Step 12 is an exercise demonstrating the problem of flow in a channel or pipe. If you recall from fluid mechanics
+class, a specified pressure gradient is what drives Poisseulle flow.
+
+Recall the $x$-momentum equation:
+
+$$\frac{\partial u}{\partial t}+u \cdot \nabla u = -\frac{\partial p}{\partial x}+\nu \nabla^2 u$$
+
+
+What we actually do in Step 12 is split the pressure into steady and unsteady components $p=P+p'$.
+The applied steady pressure gradient is the constant $-\frac{\partial P}{\partial x}=F$(interpreted as a source term),
+and the unsteady component is $\frac{\partial p'}{\partial x}$. So the pressure that we solve for in Step 12 is
+actually $p'$, which for a steady flow is in fact equal to zero everywhere.
+
+**Why did we do this?**
+
+Note that we used periodic boundary conditions for this flow. For a flow with a constant pressure gradient,
+the value of pressure on the left edge of the domain must be different from the pressure at the right edge.
+So we cannot apply periodic boundary conditions on the pressure directly.
+It is easier to fix the gradient and solve the perturbations in pressure.
+
+**Shouldn't we always expect a uniform/constant $p'$ then?**
+
+That's true only in the case of steady laminar flows. At high Reynolds numbers, flows in channels can become
+turbulent, and we will see unsteady fluctuations in the pressure, which will result in non-zero values for $p'$.
+
+In step 12, note that the pressure field itself is not constant, but it's the pressure perturbation field is.
+The pressure field varies linearly along the channel with slope equal to the pressure gradient. Also, for
+incompressible flows, the absolute value of the pressure is inconsequential.
+
+**And explore more CFD materials online**
+
+The interactive module **12 steps to Navier-Stokes** is one of several components of the Computational Fluid Dynamics class
+taught by Prof. Lorena A. Barba in Boston University between 2009 and 2013.
+
+For a sample of what the other components of this class are, you can explore the **Resources** section of the Spring 2013
+version of [the course's Piazza site](https://piazza.com/bu/spring2013/me702/resources).
+
+
+
+```{=html}
+<div style="background-color:grey;height:2px;width:100%;"></div>
+```
+
+
+
+```{=html}
+<div><pre><small><small>source: <a href="https://github.com/scicloj/cfd-python-in-clojure/blob/main/notebooks/steps/step_12.clj">notebooks/steps/step_12.clj</a></small></small></pre></div>
+```

@@ -61,6 +61,8 @@ with states of its density, pressure and temperature.
 
 * [Step 11 - Cavity Flow with Navier-Stokes](steps.step_11.html)
 
+* [Step 12 - Channel Flow with Navier-Stokes](steps.step_12.html)
+
 
 ```{=html}
 <div style="background-color:grey;height:2px;width:100%;"></div>
