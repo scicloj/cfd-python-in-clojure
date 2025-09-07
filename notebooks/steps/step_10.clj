@@ -59,9 +59,11 @@
 (def ny 50)
 (def nt 100)
 (def nt 100)
+(def dx (double (/ 2 (dec nx))))
+(def dy (double (/ 1 (dec ny))))
 (def spatial-init-param
-  {:nx nx :x-start 0 :x-end 2 :dx (double (/ 2 (dec nx)))
-   :ny ny :y-start 0 :y-end 1 :dy (double (/ 1 (dec ny)))
+  {:nx nx :x-start 0 :x-end 2 :dx dx :dx-square (* dx dx)
+   :ny ny :y-start 0 :y-end 1 :dy dy :dy-square (* dy dy)
    :nt nt})
 ;;
 ;; Have the discretized 2D spatial array ready:
@@ -85,25 +87,37 @@
 (defn poisson-2d [{:keys [spatial-array
                           array-p
                           array-b
-                          nx ny dx dy]
+                          nx ny
+                          dx dy
+                          dx-square dy-square]
                    :as   params}]
-  (dotimes [y-idx (- ny 2)]
-    (dotimes [x-idx (- nx 2)]
-      (let [y-idx   (inc y-idx)
-            x-idx   (inc x-idx)
-            pd      (two-d/clone-2d-array array-p)
-            p-j-i+1 (aget pd y-idx (inc x-idx))
-            p-j-i-1 (aget pd y-idx (dec x-idx))
-            p-j+1-i (aget pd (inc y-idx) x-idx)
-            p-j-1-i (aget pd (dec y-idx) x-idx)
-            b-j-i   (aget array-b y-idx x-idx)
-            dx-2    (pow dx 2)
-            dy-2    (pow dy 2)]
-        (aset array-p y-idx x-idx
-          (/ (+ (* dy-2 (+ p-j-i+1 p-j-i-1))
-                (* dx-2 (+ p-j+1-i p-j-1-i))
-                (* -1.0 b-j-i dx-2 dy-2))
-             (* 2 (+ dx-2 dy-2)))))))
+  (let [pd (two-d/clone-2d-array array-p)]
+   (dotimes [y-idx (- ny 2)]
+     (let [prev-y-idx y-idx
+           y-idx      (inc y-idx)
+           next-y-idx (inc y-idx)
+
+           pd-prev-x  (aget pd prev-y-idx)
+           pd-x       (aget pd y-idx)
+           pd-next-x  (aget pd next-y-idx)]
+      (dotimes [x-idx (- nx 2)]
+        (let [prev-x-idx x-idx
+              x-idx      (inc x-idx)
+              next-x-idx (inc x-idx)
+
+              p-j-i+1    (aget pd-x next-x-idx)
+              p-j-i-1    (aget pd-x prev-x-idx)
+              p-j+1-i    (aget pd-next-x x-idx)
+              p-j-1-i    (aget pd-prev-x x-idx)
+
+              b-j-i      (aget array-b y-idx x-idx)]
+          (aset array-p y-idx x-idx
+            (/ (+ (* dy-square (+ p-j-i+1 p-j-i-1))
+                  (* dx-square (+ p-j+1-i p-j-1-i))
+                  (* -1.0 b-j-i dx-square dy-square))
+               (* 2 (+ dx-square dy-square)))))))))
+
+  ;; Boundary conditions
   (dotimes [y-idx ny]
     (aset array-p y-idx 0 0.0)
     (aset array-p y-idx (dec nx) 0.0))
