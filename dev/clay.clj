@@ -6,7 +6,7 @@
 (def steps-file-path "notebooks/steps.edn")
 
 (def full-source-path
-  (into ["notebooks/index.clj"]
+  (into ["index.clj"]
         (->> steps-file-path
              ((comp edn/read-string slurp))
              (map :src))))
@@ -17,6 +17,7 @@
     {:format              [:quarto :html]
      :base-target-path    "docs"
      :clean-up-target-dir true
+     :base-source-path    "notebooks"
      :source-path         full-source-path
      :book                {:title "CFD Python in Clojure"}}))
 

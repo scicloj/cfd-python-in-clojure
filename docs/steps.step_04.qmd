@@ -4,8 +4,6 @@ format:
     toc: true
     toc-depth: 4
     theme: [cosmo, notebooks/custom.scss]
-    output-file: steps.step_04.html
-code-block-background: true
 
 ---
 <style></style><style>.printedClojure .sourceCode {
@@ -16,7 +14,7 @@ code-block-background: true
 .clay-side-by-side .sourceCode {margin: 0}
 .clay-side-by-side {margin: 1em 0}
 </style>
-<script src="steps.step_04_files/md-default0.js" type="text/javascript"></script><script src="steps.step_04_files/md-default1.js" type="text/javascript"></script><script src="steps.step_04_files/katex2.js" type="text/javascript"></script><script src="steps.step_04_files/vega3.js" type="text/javascript"></script><script src="steps.step_04_files/vega4.js" type="text/javascript"></script><script src="steps.step_04_files/vega5.js" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" type="text/javascript"></script><script src="https://code.jquery.com/ui/1.13.1/jquery-ui.min.js" type="text/javascript"></script><script src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js" type="text/javascript"></script><script src="https://cdn.jsdelivr.net/npm/vega@5.25.0" type="text/javascript"></script><script src="https://cdn.jsdelivr.net/npm/vega-lite@5.16.3" type="text/javascript"></script><script src="https://cdn.jsdelivr.net/npm/vega-embed@6.22.2" type="text/javascript"></script><link href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css" rel="stylesheet" type="text/css" />
 
 # 1-D Burgers' Equation
 A fundamental PDE & convection-diffusion equation.
@@ -163,23 +161,23 @@ Calculate u and plot:
 
 ::: {.printedClojure}
 ```clojure
-[3.982484, 4.0450406, 4.1075974, 4.170154, 4.232711, 4.2952676,
- 4.3578243, 4.420381, 4.482938, 4.5454946, 4.6080513, 4.670608,
- 4.733165, 4.7957215, 4.8582783, 4.920835, 4.983392, 5.045948,
- 5.108505, 5.1710615, 5.2336183, 5.296175, 5.3587317, 5.4212885,
- 5.483845, 5.546402, 5.6089587, 5.6715155, 5.734072, 5.796629,
- 5.8591857, 5.9217424, 5.984299, 6.0468554, 6.109412, 6.171969,
- 6.2345257, 6.2970824, 6.359639, 6.422196, 6.4847527, 6.5473094,
- 6.609866, 6.672423, 6.734979, 6.797534, 6.860055, 6.9220233,
- 6.9748416, 6.880349, 5.152262, 1.6489367, 1.0293779, 1.0453354,
- 1.1050574, 1.1674429, 1.2299894, 1.2925454, 1.3551022, 1.4176589,
- 1.4802157, 1.5427722, 1.6053289, 1.6678857, 1.7304426, 1.7929994,
- 1.8555557, 1.9181124, 1.9806691, 2.0432258, 2.1057825, 2.1683393,
- 2.230896, 2.2934527, 2.3560095, 2.4185662, 2.481123, 2.5436797,
- 2.6062365, 2.6687932, 2.73135, 2.7939067, 2.8564634, 2.9190202,
- 2.9815764, 3.0441332, 3.10669, 3.1692467, 3.2318034, 3.2943602,
- 3.356917, 3.4194736, 3.4820304, 3.5445871, 3.6071439, 3.6697006,
- 3.7322574, 3.794814, 3.8573709, 3.9199276, 3.9824843]
+[2.7665834, 2.810041, 2.8534985, 2.896956, 2.9404135, 2.9838707,
+ 3.027328, 3.0707853, 3.1142426, 3.1577, 3.2011576, 3.244615,
+ 3.2880726, 3.33153, 3.3749874, 3.4184446, 3.4619021, 3.5053596,
+ 3.5488172, 3.5922744, 3.6357317, 3.679189, 3.7226465, 3.766104,
+ 3.8095615, 3.853019, 3.8964763, 3.9399338, 3.983391, 4.0268483,
+ 4.070306, 4.113763, 4.1572204, 4.200678, 4.2441354, 4.2875924,
+ 4.33105, 4.3745074, 4.417965, 4.461422, 4.5048795, 4.548337,
+ 4.5917945, 4.635252, 4.6787095, 4.722167, 4.765624, 4.8090816,
+ 4.852539, 4.8959966, 4.939454, 4.982911, 5.026369, 5.0698266,
+ 5.1132836, 5.1567407, 5.200197, 5.2436533, 5.2871075, 5.3305573,
+ 5.3739967, 5.417413, 5.460777, 5.5040193, 5.546986, 5.5893273,
+ 5.630253, 5.667983, 5.6985307, 5.7130485, 5.6922836, 5.5961103,
+ 5.348928, 4.8410926, 4.01946, 3.0892584, 2.4052658, 2.0581272,
+ 1.9277661, 1.90015, 1.9154866, 1.9479402, 1.9871031, 2.028884,
+ 2.0716863, 2.1148875, 2.1582446, 2.2016628, 2.245105, 2.2885563,
+ 2.3320115, 2.375468, 2.418925, 2.4623823, 2.5058396, 2.5492969,
+ 2.5927541, 2.6362116, 2.679669, 2.7231262, 2.7665834]
 
 ```
 :::

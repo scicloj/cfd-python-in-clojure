@@ -1,7 +1,9 @@
 {:paths ["src"]
  :deps
  {org.clojure/clojure {:mvn/version "1.12.1"}
-  org.scicloj/noj     {:mvn/version "2-beta18"}}
+  org.scicloj/noj     {:mvn/version "2-beta18"}
+
+  org.scicloj/clay    {:mvn/version "2-beta56"}}
 
  :aliases
  {:dev {:extra-paths ["dev" "notebooks"]}}}

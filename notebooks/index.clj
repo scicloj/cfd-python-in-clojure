@@ -36,7 +36,7 @@ with states of its density, pressure and temperature.
 ^:kindly/hide-code
 (def src->url #(let [src-list (-> %
                                   (clojure.string/split #"[/.]")
-                                  ((comp rest pop))
+                                  (pop)
                                   (concat ["html"]))]
                  (clojure.string/join "." src-list)))
 
