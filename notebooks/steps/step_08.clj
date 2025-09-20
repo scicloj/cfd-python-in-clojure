@@ -67,7 +67,8 @@
 ;;
 ;; initial plotting w/ $x$, $y$, $u$ goes:
 ;;
-(two-d/sim->plotly-plot-it! spatial-arr array-u)
+^:kindly/hide-code (def init-u (two-d/clone-2d-array array-u))
+(two-d/sim->plotly-plot-it! spatial-arr init-u)
 ;;
 (def sim-result (two-d/simulate {:array-u array-u
                                  :array-v array-v} (assoc init-params :mode :burgers)))

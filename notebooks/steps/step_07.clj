@@ -59,22 +59,27 @@
 ;;
 ;; initial plotting goes:
 ;;
+^:kindly/hide-code (def init-u (two-d/clone-2d-array array-u))
+^:kindly/hide-code (def copy-2d-from-sim #(update % :array-u two-d/clone-2d-array))
 ^:kindly/hide-code
-(two-d/sim->plotly-plot-it! spatial-arr array-u)
+(two-d/sim->plotly-plot-it! spatial-arr init-u)
 ;;
 ;; ### Iterating in 2-D w/ diffusion equation
 ;;
 ^:kindly/hide-code (def param-with-mode (assoc init-params :mode :diffusion))
-^:kindly/hide-code (def sim-result-1 (two-d/simulate {:array-u array-u} param-with-mode))
+^:kindly/hide-code (def sim-result-1 (copy-2d-from-sim
+                                       (two-d/simulate {:array-u array-u} param-with-mode)))
 ;;
 ;; at $nt=10$
 ^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-1))
 ;;
 ;; at $nt=14$
-^:kindly/hide-code (def sim-result-2 (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 4)))
+^:kindly/hide-code (def sim-result-2 (copy-2d-from-sim
+                                       (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 4))))
 ^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-2))
 ;;
 ;; at $nt=50$
-^:kindly/hide-code (def sim-result-3 (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 36)))
+^:kindly/hide-code (def sim-result-3 (copy-2d-from-sim
+                                      (two-d/simulate {:array-u array-u} (assoc param-with-mode :nt 36))))
 ^:kindly/hide-code (two-d/sim->plotly-plot-it! spatial-arr (:array-u sim-result-3))
 ;;

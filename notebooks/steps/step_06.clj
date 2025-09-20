@@ -68,6 +68,7 @@
 ;;
 ;; Create the initial u and v arrays
 (def array-u (two-d/create-init-u init-params spatial-arr))
+(def init-u (two-d/clone-2d-array array-u))
 (def array-v (two-d/create-init-u init-params spatial-arr))
 ;;
 ^:kindly/hide-code
@@ -81,7 +82,7 @@
 ;; initial plotting w/ $x$, $y$, $u$ goes:
 ;;
 ^:kindly/hide-code
-(two-d/sim->plotly-plot-it! spatial-arr array-u)
+(two-d/sim->plotly-plot-it! spatial-arr init-u)
 ;;
 ;; ### Iterating in 2-D w/ nonlinear convection equation
 ;;

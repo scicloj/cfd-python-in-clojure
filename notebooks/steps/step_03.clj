@@ -52,5 +52,6 @@
     {:mark     "line"
      :width    500 :height 300
      :encoding {:x {:field "x" :type "quantitative"}
-                :y {:field "y" :type "quantitative"}}
+                :y {:field "y" :type "quantitative"
+                    :scale {:domain [0.8 2.1]}}}
      :data     {:values (into [] (map #(hash-map :x % :y %2) array-x u))}}))

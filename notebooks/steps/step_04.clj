@@ -77,10 +77,12 @@
 
 ^:kindly/hide-code
 (kind/vega-lite
-  {:mark     "point"
+  {:mark     {:type  "line"
+              :point true}
    :width    500 :height 300
    :encoding {:x {:field "x" :type "quantitative"}
-              :y {:field "y" :type "quantitative"}}
+              :y {:field "y" :type "quantitative"
+                  :scale {:domain [0.0 10.0]}}}
    :data     {:values (into [] (map #(hash-map :x % :y %2) x-arr y-arr))}})
 ;; ^^_"saw-tooth function"_
 
@@ -99,18 +101,19 @@
 (let [u-computational (one-d/simulate y-arr init-params)
       u-analytical    (one-d/update-analytical-burger-u (assoc init-params :dt (* nt dt)))]
   (kind/vega-lite
-    {:mark  "point"
-     :width 500 :height 300
-     :layer [{:mark     {:type "line" :color "green" :point {:filled false
-                                                             :color  "green"
-                                                             :fill   "white"}}
-              :encoding {:x {:field "x" :type "quantitative"}
-                         :y {:field "computational" :type "quantitative"}}}
+    {:mark     "point"
+     :width    500 :height 300
+     :encoding {:y {:scale {:domain [0.0 10.0]}}}
+     :layer    [{:mark     {:type "line" :color "green" :point {:filled false
+                                                                :color  "green"
+                                                                :fill   "white"}}
+                 :encoding {:x {:field "x" :type "quantitative"}
+                            :y {:field "computational" :type "quantitative"}}}
 
-             {:mark     {:type "line" :color "orange"}
-              :encoding {:x {:field "x" :type "quantitative"}
-                         :y {:field "analytical" :type "quantitative"}}}]
-     :data  {:values (into [] (map #(hash-map :x % :computational %2 :analytical %3)
-                                   x-arr
-                                   u-computational
-                                   u-analytical))}}))
+                {:mark     {:type "line" :color "orange"}
+                 :encoding {:x {:field "x" :type "quantitative"}
+                            :y {:field "analytical" :type "quantitative"}}}]
+     :data     {:values (into [] (map #(hash-map :x % :computational %2 :analytical %3)
+                                      x-arr
+                                      u-computational
+                                      u-analytical))}}))

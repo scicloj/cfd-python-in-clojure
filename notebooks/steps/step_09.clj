@@ -125,6 +125,8 @@
 ;; Now let's try looking at our initial condition plot.
 ;;
 
+^:kindly/hide-code (def init-p (two-d/clone-2d-array array-p))
+
 (def plotly-surface-plot-base-opts
   (let [[array-x array-y] spatial-array]
     {:layout {:scene {:xaxis {:range [0.0 2.1]}
@@ -132,7 +134,7 @@
                       :zaxis {:range [0.0 1.1]}}}
      :data   [{:x       array-x
                :y       array-y
-               :z       array-p
+               :z       init-p
                :type    :surface
                :opacity 0.20
                :color   "size"

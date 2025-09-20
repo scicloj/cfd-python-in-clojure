@@ -2,7 +2,6 @@
 (ns steps.step-10
   (:require
    [cfd.two-d :as two-d]
-   [fastmath.core :as fm :refer [pow]]
    [scicloj.kindly.v4.api :as kindly]
    [scicloj.kindly.v4.kind :as kind]
    [utils.notebook :refer [md tex]]))
@@ -58,12 +57,13 @@
 (def nx 50)
 (def ny 50)
 (def nt 100)
-(def nt 100)
-(def dx (double (/ 2 (dec nx))))
-(def dy (double (/ 1 (dec ny))))
+(def x-end 2.0)
+(def y-end 1.0)
+(def dx (double (/ x-end (dec nx))))
+(def dy (double (/ y-end (dec ny))))
 (def spatial-init-param
-  {:nx nx :x-start 0 :x-end 2 :dx dx :dx-square (* dx dx)
-   :ny ny :y-start 0 :y-end 1 :dy dy :dy-square (* dy dy)
+  {:nx nx :x-start 0.0 :x-end x-end :dx dx :dx-square (* dx dx)
+   :ny ny :y-start 0.0 :y-end y-end :dy dy :dy-square (* dy dy)
    :nt nt})
 ;;
 ;; Have the discretized 2D spatial array ready:
@@ -75,7 +75,7 @@
                       :condition-fn (constantly 0.0))
                spatial-array))
 
-(def array-b (aclone array-p))
+(def array-b (two-d/clone-2d-array array-p))
 (aset array-b (int (* ny 0.25)) (int (* nx 0.25)) 100.0)
 (aset array-b (int (* ny 0.25 3)) (int (* nx 0.25 3)) -100.0)
 
@@ -142,7 +142,7 @@
   (let [[array-x array-y] spatial-array]
     {:layout {:scene {:xaxis {:range [0.0 2.1]}
                       :yaxis {:range [0.0 1.1]}
-                      :zaxis {:range [-0.2 0.2]}}}
+                      :zaxis {:range [-0.06 0.06]}}}
      :data   [{:x       array-x
                :y       array-y
                :z       array-p
